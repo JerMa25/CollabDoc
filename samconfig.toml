@@ -1,0 +1,13 @@
+version = 0.1
+
+[default.global.parameters]
+stack_name = "collabdoc"
+region = "eu-north-1"
+
+[default.deploy.parameters]
+capabilities = "CAPABILITY_IAM"
+resolve_s3 = true
+s3_prefix = "collabdoc"
+confirm_changeset = false
+fail_on_empty_changeset = false
+tags = "project=\"collabdoc\""

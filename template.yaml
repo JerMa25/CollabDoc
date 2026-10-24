@@ -1,0 +1,632 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  CollabDoc - shared document editor (collaborative editing, limited PDF download links).
+  Single region. Every function has its own IAM role limited to what it uses.
+
+Parameters:
+  NotificationSender:
+    Type: String
+    Description: SES-verified e-mail address used as sender of the "last download" e-mail
+  SessionSecretParam:
+    Type: String
+    Default: /collabdoc/session-secret
+    Description: SSM SecureString holding the HMAC secret used to sign writer sessions
+  AdminTokenParam:
+    Type: String
+    Default: /collabdoc/admin-token
+    Description: SSM SecureString holding the admin dashboard token
+  ClaimRateLimit:
+    Type: Number
+    Default: 300
+    Description: Steady-state requests/second accepted on POST /links/{linkId}/claim (excess -> 429 "please wait")
+  ClaimBurstLimit:
+    Type: Number
+    Default: 300
+  ClaimReservedConcurrency:
+    Type: Number
+    Default: 100
+    Description: Lambda concurrency reserved for (and capped to) the download function, so the peak cannot starve the editor
+
+Globals:
+  Function:
+    Runtime: nodejs22.x
+    Architectures: [arm64]
+    MemorySize: 512
+    Timeout: 10
+    Handler: index.handler
+    LoggingConfig:
+      LogGroup: !Ref LambdaLogGroup
+      LogFormat: Text
+    Tags:
+      project: collabdoc
+    Environment:
+      Variables:
+        TABLE_DOCUMENTS: !Ref DocumentsTable
+        TABLE_MEMBERS: !Ref MembersTable
+        TABLE_UPDATES: !Ref UpdatesTable
+        TABLE_CREDITS: !Ref CreditsTable
+        TABLE_CONNECTIONS: !Ref ConnectionsTable
+        TABLE_LINKS: !Ref LinksTable
+        TABLE_CLAIMS: !Ref ClaimsTable
+        TABLE_VERSIONS: !Ref VersionsTable
+        TABLE_ABUSE: !Ref AbuseTable
+        DATA_BUCKET: !Ref DataBucket
+        WS_ENDPOINT: !Sub https://${WebSocketApi}.execute-api.${AWS::Region}.amazonaws.com/prod
+        SESSION_SECRET_PARAM: !Ref SessionSecretParam
+        ADMIN_TOKEN_PARAM: !Ref AdminTokenParam
+        NOTIFICATION_SENDER: !Ref NotificationSender
+
+Resources:
+  # ---------------------------------------------------------------- logs
+  LambdaLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /collabdoc/${AWS::StackName}/lambda
+      RetentionInDays: 14
+
+  # ---------------------------------------------------------------- storage
+  DataBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault: { SSEAlgorithm: AES256 }
+      LifecycleConfiguration:
+        Rules:
+          - Id: expire-old-pdf-renders
+            Status: Enabled
+            Prefix: pdf/
+            ExpirationInDays: 2
+      Tags: [{ Key: project, Value: collabdoc }]
+
+  DataBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref DataBucket
+      PolicyDocument:
+        Statement:
+          - Sid: DenyInsecureTransport
+            Effect: Deny
+            Principal: '*'
+            Action: 's3:*'
+            Resource: [!GetAtt DataBucket.Arn, !Sub '${DataBucket.Arn}/*']
+            Condition: { Bool: { 'aws:SecureTransport': false } }
+
+  DocumentsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions: [{ AttributeName: docId, AttributeType: S }]
+      KeySchema: [{ AttributeName: docId, KeyType: HASH }]
+      Tags: [{ Key: project, Value: collabdoc }]
+
+  MembersTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - { AttributeName: email, AttributeType: S }
+        - { AttributeName: docId, AttributeType: S }
+      KeySchema:
+        - { AttributeName: email, KeyType: HASH }
+        - { AttributeName: docId, KeyType: RANGE }
+      GlobalSecondaryIndexes:
+        - IndexName: byDoc
+          KeySchema:
+            - { AttributeName: docId, KeyType: HASH }
+            - { AttributeName: email, KeyType: RANGE }
+          Projection: { ProjectionType: ALL }
+      Tags: [{ Key: project, Value: collabdoc }]
+
+  UpdatesTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - { AttributeName: docId, AttributeType: S }
+        - { AttributeName: updateId, AttributeType: S }
+      KeySchema:
+        - { AttributeName: docId, KeyType: HASH }
+        - { AttributeName: updateId, KeyType: RANGE }
+      Tags: [{ Key: project, Value: collabdoc }]
+
+  CreditsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions: [{ AttributeName: pk, AttributeType: S }]
+      KeySchema: [{ AttributeName: pk, KeyType: HASH }]
+      TimeToLiveSpecification: { AttributeName: ttl, Enabled: true }
+      Tags: [{ Key: project, Value: collabdoc }]
+
+  ConnectionsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - { AttributeName: connectionId, AttributeType: S }
+        - { AttributeName: docId, AttributeType: S }
+      KeySchema: [{ AttributeName: connectionId, KeyType: HASH }]
+      GlobalSecondaryIndexes:
+        - IndexName: byDoc
+          KeySchema: [{ AttributeName: docId, KeyType: HASH }]
+          Projection: { ProjectionType: KEYS_ONLY }
+      TimeToLiveSpecification: { AttributeName: ttl, Enabled: true }
+      Tags: [{ Key: project, Value: collabdoc }]
+
+  LinksTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - { AttributeName: linkId, AttributeType: S }
+        - { AttributeName: docId, AttributeType: S }
+      KeySchema: [{ AttributeName: linkId, KeyType: HASH }]
+      GlobalSecondaryIndexes:
+        - IndexName: byDoc
+          KeySchema: [{ AttributeName: docId, KeyType: HASH }]
+          Projection: { ProjectionType: ALL }
+      StreamSpecification: { StreamViewType: NEW_AND_OLD_IMAGES }
+      Tags: [{ Key: project, Value: collabdoc }]
+
+  ClaimsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - { AttributeName: linkId, AttributeType: S }
+        - { AttributeName: claimId, AttributeType: S }
+      KeySchema:
+        - { AttributeName: linkId, KeyType: HASH }
+        - { AttributeName: claimId, KeyType: RANGE }
+      Tags: [{ Key: project, Value: collabdoc }]
+
+  VersionsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - { AttributeName: docId, AttributeType: S }
+        - { AttributeName: versionId, AttributeType: S }
+      KeySchema:
+        - { AttributeName: docId, KeyType: HASH }
+        - { AttributeName: versionId, KeyType: RANGE }
+      Tags: [{ Key: project, Value: collabdoc }]
+
+  AbuseTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions: [{ AttributeName: pk, AttributeType: S }]
+      KeySchema: [{ AttributeName: pk, KeyType: HASH }]
+      TimeToLiveSpecification: { AttributeName: ttl, Enabled: true }
+      Tags: [{ Key: project, Value: collabdoc }]
+
+  # ---------------------------------------------------------------- HTTP API
+  HttpApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      CorsConfiguration:
+        AllowOrigins: ['*']
+        AllowHeaders: [content-type, authorization, x-admin-token]
+        AllowMethods: [GET, POST, OPTIONS]
+        MaxAge: 600
+      DefaultRouteSettings:
+        ThrottlingBurstLimit: 1000
+        ThrottlingRateLimit: 1000
+      RouteSettings:
+        'POST /links/{linkId}/claim':
+          ThrottlingBurstLimit: !Ref ClaimBurstLimit
+          ThrottlingRateLimit: !Ref ClaimRateLimit
+      Tags:
+        project: collabdoc
+
+  # ---------------------------------------------------------------- WebSocket API
+  WebSocketApi:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: !Sub ${AWS::StackName}-ws
+      ProtocolType: WEBSOCKET
+      RouteSelectionExpression: $request.body.action
+      Tags: { project: collabdoc }
+
+  WebSocketStage:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      ApiId: !Ref WebSocketApi
+      StageName: prod
+      AutoDeploy: true
+      DefaultRouteSettings:
+        ThrottlingBurstLimit: 500
+        ThrottlingRateLimit: 1000
+    DependsOn: [ConnectRoute, DisconnectRoute, DefaultRoute]
+
+  ConnectIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref WebSocketApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${WsConnectFunction.Arn}/invocations
+  ConnectRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref WebSocketApi
+      RouteKey: $connect
+      Target: !Sub integrations/${ConnectIntegration}
+  ConnectPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref WsConnectFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApi}/*
+
+  DisconnectIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref WebSocketApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${WsDisconnectFunction.Arn}/invocations
+  DisconnectRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref WebSocketApi
+      RouteKey: $disconnect
+      Target: !Sub integrations/${DisconnectIntegration}
+  DisconnectPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref WsDisconnectFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApi}/*
+
+  DefaultIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref WebSocketApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${WsMessageFunction.Arn}/invocations
+  DefaultRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref WebSocketApi
+      RouteKey: $default
+      Target: !Sub integrations/${DefaultIntegration}
+  DefaultPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref WsMessageFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApi}/*
+
+  # ---------------------------------------------------------------- functions
+  ApiFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Description: Writers REST API (session, documents, sharing, state, versions, links)
+      CodeUri: backend/dist/api
+      Timeout: 20
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action: ssm:GetParameter
+              Resource: !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${SessionSecretParam}
+        - DynamoDBCrudPolicy: { TableName: !Ref DocumentsTable }
+        - DynamoDBCrudPolicy: { TableName: !Ref MembersTable }
+        - DynamoDBCrudPolicy: { TableName: !Ref UpdatesTable }
+        - DynamoDBCrudPolicy: { TableName: !Ref VersionsTable }
+        - DynamoDBCrudPolicy: { TableName: !Ref LinksTable }
+        - DynamoDBReadPolicy: { TableName: !Ref CreditsTable }
+        - DynamoDBReadPolicy: { TableName: !Ref AbuseTable }
+        - Statement:
+            - Effect: Allow
+              Action: [dynamodb:Query]
+              Resource: !Sub ${ConnectionsTable.Arn}/index/byDoc
+            - Effect: Allow
+              Action: [dynamodb:DeleteItem]
+              Resource: !GetAtt ConnectionsTable.Arn
+            - Effect: Allow
+              Action: [s3:GetObject, s3:PutObject]
+              Resource: !Sub ${DataBucket.Arn}/versions/*
+            - Effect: Allow
+              Action: execute-api:ManageConnections
+              Resource: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApi}/prod/POST/@connections/*
+      Events:
+        Session: { Type: HttpApi, Properties: { ApiId: !Ref HttpApi, Method: POST, Path: /session } }
+        Me: { Type: HttpApi, Properties: { ApiId: !Ref HttpApi, Method: GET, Path: /me } }
+        ListDocs: { Type: HttpApi, Properties: { ApiId: !Ref HttpApi, Method: GET, Path: /documents } }
+        CreateDoc: { Type: HttpApi, Properties: { ApiId: !Ref HttpApi, Method: POST, Path: /documents } }
+        GetDoc: { Type: HttpApi, Properties: { ApiId: !Ref HttpApi, Method: GET, Path: '/documents/{docId}' } }
+        AddMember: { Type: HttpApi, Properties: { ApiId: !Ref HttpApi, Method: POST, Path: '/documents/{docId}/members' } }
+        GetState: { Type: HttpApi, Properties: { ApiId: !Ref HttpApi, Method: GET, Path: '/documents/{docId}/state' } }
+        ListVersions: { Type: HttpApi, Properties: { ApiId: !Ref HttpApi, Method: GET, Path: '/documents/{docId}/versions' } }
+        CreateVersion: { Type: HttpApi, Properties: { ApiId: !Ref HttpApi, Method: POST, Path: '/documents/{docId}/versions' } }
+        GetVersion: { Type: HttpApi, Properties: { ApiId: !Ref HttpApi, Method: GET, Path: '/documents/{docId}/versions/{versionId}' } }
+        RestoreVersion: { Type: HttpApi, Properties: { ApiId: !Ref HttpApi, Method: POST, Path: '/documents/{docId}/versions/{versionId}/restore' } }
+        CreateLink: { Type: HttpApi, Properties: { ApiId: !Ref HttpApi, Method: POST, Path: '/documents/{docId}/links' } }
+        ListLinks: { Type: HttpApi, Properties: { ApiId: !Ref HttpApi, Method: GET, Path: '/documents/{docId}/links' } }
+
+  UpdateFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Description: Accepts an edit - credit debit + storage in one DynamoDB transaction, then broadcast
+      CodeUri: backend/dist/update
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action: ssm:GetParameter
+              Resource: !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${SessionSecretParam}
+            - Effect: Allow
+              Action: execute-api:ManageConnections
+              Resource: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApi}/prod/POST/@connections/*
+            - Effect: Allow
+              Action: [dynamodb:PutItem]
+              Resource: !GetAtt UpdatesTable.Arn
+            - Effect: Allow
+              Action: [dynamodb:UpdateItem]
+              Resource: [!GetAtt DocumentsTable.Arn, !GetAtt CreditsTable.Arn, !GetAtt AbuseTable.Arn]
+            - Effect: Allow
+              Action: [dynamodb:GetItem]
+              Resource: [!GetAtt MembersTable.Arn, !GetAtt CreditsTable.Arn, !GetAtt AbuseTable.Arn]
+            - Effect: Allow
+              Action: [dynamodb:PutItem]
+              Resource: !GetAtt AbuseTable.Arn
+            - Effect: Allow
+              Action: [dynamodb:Query]
+              Resource: !Sub ${ConnectionsTable.Arn}/index/byDoc
+            - Effect: Allow
+              Action: [dynamodb:DeleteItem]
+              Resource: !GetAtt ConnectionsTable.Arn
+      Events:
+        PostUpdate: { Type: HttpApi, Properties: { ApiId: !Ref HttpApi, Method: POST, Path: '/documents/{docId}/updates' } }
+
+  ClaimFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Description: Public download - atomic decrement of the link counter, PDF of the current state, presigned URL
+      CodeUri: backend/dist/claim
+      Timeout: 15
+      MemorySize: 1024
+      ReservedConcurrentExecutions: !Ref ClaimReservedConcurrency
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action: [dynamodb:GetItem, dynamodb:UpdateItem]
+              Resource: !GetAtt LinksTable.Arn
+            - Effect: Allow
+              Action: [dynamodb:PutItem]
+              Resource: !GetAtt ClaimsTable.Arn
+            - Effect: Allow
+              Action: [dynamodb:GetItem]
+              Resource: !GetAtt DocumentsTable.Arn
+            - Effect: Allow
+              Action: [dynamodb:Query]
+              Resource: !GetAtt UpdatesTable.Arn
+            - Effect: Allow
+              Action: [s3:GetObject, s3:PutObject]
+              Resource: !Sub ${DataBucket.Arn}/pdf/*
+      Events:
+        Claim: { Type: HttpApi, Properties: { ApiId: !Ref HttpApi, Method: POST, Path: '/links/{linkId}/claim' } }
+        Status: { Type: HttpApi, Properties: { ApiId: !Ref HttpApi, Method: GET, Path: '/links/{linkId}' } }
+        PublicStatus: { Type: HttpApi, Properties: { ApiId: !Ref HttpApi, Method: GET, Path: '/public/links/{linkId}' } }
+
+  AdminFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Description: Read-only admin view (open documents, active links, blocked writers)
+      CodeUri: backend/dist/admin
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action: ssm:GetParameter
+              Resource: !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${AdminTokenParam}
+            - Effect: Allow
+              Action: [dynamodb:Scan]
+              Resource: [!GetAtt ConnectionsTable.Arn, !GetAtt LinksTable.Arn, !GetAtt AbuseTable.Arn]
+            - Effect: Allow
+              Action: [dynamodb:BatchGetItem]
+              Resource: !GetAtt DocumentsTable.Arn
+      Events:
+        State: { Type: HttpApi, Properties: { ApiId: !Ref HttpApi, Method: GET, Path: /admin/state } }
+
+  WsConnectFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Description: WebSocket $connect - checks session token and document access
+      CodeUri: backend/dist/wsConnect
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action: ssm:GetParameter
+              Resource: !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${SessionSecretParam}
+            - Effect: Allow
+              Action: [dynamodb:GetItem]
+              Resource: [!GetAtt MembersTable.Arn, !GetAtt AbuseTable.Arn]
+            - Effect: Allow
+              Action: [dynamodb:PutItem, dynamodb:DeleteItem]
+              Resource: !GetAtt ConnectionsTable.Arn
+            - Effect: Allow
+              Action: [dynamodb:Query]
+              Resource: !Sub ${ConnectionsTable.Arn}/index/byDoc
+            - Effect: Allow
+              Action: execute-api:ManageConnections
+              Resource: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApi}/prod/POST/@connections/*
+
+  WsDisconnectFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Description: WebSocket $disconnect
+      CodeUri: backend/dist/wsDisconnect
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action: [dynamodb:DeleteItem]
+              Resource: !GetAtt ConnectionsTable.Arn
+            - Effect: Allow
+              Action: [dynamodb:Query]
+              Resource: !Sub ${ConnectionsTable.Arn}/index/byDoc
+            - Effect: Allow
+              Action: execute-api:ManageConnections
+              Resource: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApi}/prod/POST/@connections/*
+
+  WsMessageFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Description: WebSocket $default - relays presence (awareness) to the other participants
+      CodeUri: backend/dist/wsMessage
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action: [dynamodb:GetItem, dynamodb:DeleteItem]
+              Resource: !GetAtt ConnectionsTable.Arn
+            - Effect: Allow
+              Action: [dynamodb:Query]
+              Resource: !Sub ${ConnectionsTable.Arn}/index/byDoc
+            - Effect: Allow
+              Action: execute-api:ManageConnections
+              Resource: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApi}/prod/POST/@connections/*
+
+  NotifyFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Description: E-mails the link creator when the last copy is taken (DynamoDB stream)
+      CodeUri: backend/dist/notify
+      Environment:
+        Variables:
+          FRONTEND_URL: !Sub https://${Distribution.DomainName}
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action: ses:SendEmail
+              Resource: !Sub arn:aws:ses:${AWS::Region}:${AWS::AccountId}:identity/*
+              Condition: { StringEquals: { 'ses:FromAddress': !Ref NotificationSender } }
+      Events:
+        LastCopy:
+          Type: DynamoDB
+          Properties:
+            Stream: !GetAtt LinksTable.StreamArn
+            StartingPosition: LATEST
+            BatchSize: 10
+            MaximumRetryAttempts: 5
+            FilterCriteria:
+              Filters:
+                - Pattern: '{"eventName":["MODIFY"],"dynamodb":{"NewImage":{"remaining":{"N":["0"]}},"OldImage":{"remaining":{"N":["1"]}}}}'
+
+  SnapshotFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Description: Every 10 minutes, saves an automatic version of each modified document
+      CodeUri: backend/dist/snapshot
+      Timeout: 120
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action: [dynamodb:Scan, dynamodb:GetItem, dynamodb:UpdateItem]
+              Resource: !GetAtt DocumentsTable.Arn
+            - Effect: Allow
+              Action: [dynamodb:Query]
+              Resource: !GetAtt UpdatesTable.Arn
+            - Effect: Allow
+              Action: [dynamodb:PutItem]
+              Resource: !GetAtt VersionsTable.Arn
+            - Effect: Allow
+              Action: [s3:PutObject]
+              Resource: !Sub ${DataBucket.Arn}/versions/*
+      Events:
+        Every10Min:
+          Type: ScheduleV2
+          Properties:
+            ScheduleExpression: rate(10 minutes)
+
+  # ---------------------------------------------------------------- frontend hosting
+  FrontendBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      Tags: [{ Key: project, Value: collabdoc }]
+
+  FrontendOAC:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Name: !Sub ${AWS::StackName}-oac
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+
+  FrontendBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref FrontendBucket
+      PolicyDocument:
+        Statement:
+          - Sid: AllowCloudFrontRead
+            Effect: Allow
+            Principal: { Service: cloudfront.amazonaws.com }
+            Action: s3:GetObject
+            Resource: !Sub ${FrontendBucket.Arn}/*
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub arn:aws:cloudfront::${AWS::AccountId}:distribution/${Distribution}
+
+  Distribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        Comment: CollabDoc frontend + cached public link status
+        DefaultRootObject: index.html
+        PriceClass: PriceClass_100
+        HttpVersion: http2and3
+        Origins:
+          - Id: frontend
+            DomainName: !GetAtt FrontendBucket.RegionalDomainName
+            OriginAccessControlId: !GetAtt FrontendOAC.Id
+            S3OriginConfig: { OriginAccessIdentity: '' }
+          - Id: api
+            DomainName: !Sub ${HttpApi}.execute-api.${AWS::Region}.amazonaws.com
+            CustomOriginConfig: { OriginProtocolPolicy: https-only, OriginSSLProtocols: [TLSv1.2] }
+        DefaultCacheBehavior:
+          TargetOriginId: frontend
+          ViewerProtocolPolicy: redirect-to-https
+          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6 # Managed-CachingOptimized
+          Compress: true
+        CacheBehaviors:
+          # Visitors waiting on a download page poll the link status here: CloudFront answers
+          # from its cache (max-age=2 set by the function), so 15 000 pollers cost the API
+          # only a few requests per second.
+          - PathPattern: /public/*
+            TargetOriginId: api
+            ViewerProtocolPolicy: https-only
+            AllowedMethods: [GET, HEAD]
+            CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6 # honours origin max-age
+            Compress: true
+      Tags: [{ Key: project, Value: collabdoc }]
+
+Outputs:
+  ApiUrl:
+    Value: !Sub https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com
+  WebSocketUrl:
+    Value: !Sub wss://${WebSocketApi}.execute-api.${AWS::Region}.amazonaws.com/prod
+  FrontendUrl:
+    Value: !Sub https://${Distribution.DomainName}
+  FrontendBucketName:
+    Value: !Ref FrontendBucket
+  DistributionId:
+    Value: !Ref Distribution
+  DataBucketName:
+    Value: !Ref DataBucket
+  LogGroup:
+    Value: !Ref LambdaLogGroup
