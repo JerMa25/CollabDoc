@@ -1,0 +1,15 @@
+{
+  "name": "collabdoc-tests",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "convergence": "node convergence/convergence.mjs",
+    "claim-race": "node load/claim-race.mjs",
+    "credit": "node load/credit-multidevice.mjs",
+    "writers": "node load/writers.mjs"
+  },
+  "dependencies": {
+    "ws": "^8.22.0",
+    "yjs": "^13.6.33"
+  }
+}
