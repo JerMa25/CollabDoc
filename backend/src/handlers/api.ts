@@ -9,7 +9,8 @@ import { config, TABLES } from '../lib/config'
 import { getCredit } from '../lib/credit'
 import { ddb, queryAll } from '../lib/ddb'
 import { getDocument, loadDocState } from '../lib/docstate'
-import { b64, HttpError, json, parseBody, pathParam, wrap, type HttpEvent, type HttpResult } from '../lib/http'
+import { b64, fromB64, HttpError, json, parseBody, pathParam, wrap, type HttpEvent, type HttpResult } from '../lib/http'
+import { diffFromStateVector } from '../lib/yjs'
 import { getSecret } from '../lib/secrets'
 import { createVersion, getVersionText, listVersions, restoreVersion } from '../lib/versions'
 
@@ -95,7 +96,10 @@ const routes: Record<string, Route> = {
     await requireMember(writer, docId)
     const doc = await getDocument(docId, true)
     const { state, updates } = await loadDocState(docId)
-    return json(200, { docId, rev: doc.rev ?? 0, updates, state: b64(state) })
+    // With ?sv=<client state vector, base64>, only what the client is missing is returned.
+    const sv = event.queryStringParameters?.sv
+    const body = sv ? diffFromStateVector(state, fromB64(sv)) : state
+    return json(200, { docId, rev: doc.rev ?? 0, updates, state: b64(body), diff: !!sv })
   },
 
   // --- versions --------------------------------------------------------------

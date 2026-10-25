@@ -51,6 +51,15 @@ export function textFromState(state: Uint8Array): string {
   return docFromState(state).getText(TEXT_KEY).toString()
 }
 
+/** The part of `state` that a client with state vector `sv` does not have yet. */
+export function diffFromStateVector(state: Uint8Array, sv: Uint8Array): Uint8Array {
+  try {
+    return Y.diffUpdate(state, sv)
+  } catch {
+    throw new HttpError(400, 'INVALID_STATE_VECTOR', 'sv is not a valid Yjs state vector')
+  }
+}
+
 /** Builds the update that turns the current state into `targetText` (used by version restore). */
 export function replaceTextUpdate(state: Uint8Array, targetText: string): Uint8Array {
   const doc = docFromState(state)

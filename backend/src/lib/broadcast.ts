@@ -24,10 +24,18 @@ export async function broadcast(docId: string, message: object, exceptConnection
   await Promise.all(targets.map((id) => send(id, data)))
 }
 
-async function send(connectionId: string, data: string): Promise<void> {
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+
+async function send(connectionId: string, data: string, attempt = 0): Promise<void> {
   try {
     await wsClient().send(new PostToConnectionCommand({ ConnectionId: connectionId, Data: data }))
   } catch (e: any) {
+    // API Gateway limits the push rate: retry a few times with jitter. If it still fails, the
+    // client gets the edit anyway at its next resync (see frontend/src/provider.ts).
+    if (e?.name === 'TooManyRequestsException' && attempt < 4) {
+      await sleep((50 << attempt) * (0.5 + Math.random()))
+      return send(connectionId, data, attempt + 1)
+    }
     if (e?.name === 'GoneException' || e?.$metadata?.httpStatusCode === 410) {
       // "Gone" is also returned for a socket whose $connect is still in progress. Only forget
       // connections older than 30 s, otherwise a newcomer could be removed while connecting.

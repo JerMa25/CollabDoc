@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import * as Y from 'yjs'
-import { countInsertedChars, mergeUpdates, replaceTextUpdate, textFromState } from '../src/lib/yjs'
+import { countInsertedChars, diffFromStateVector, mergeUpdates, replaceTextUpdate, textFromState } from '../src/lib/yjs'
 
 const edit = (fn: (t: Y.Text) => void, base?: Uint8Array) => {
   const doc = new Y.Doc()
@@ -51,5 +51,14 @@ describe('convergence (CRDT properties the server relies on)', () => {
     const state = edit((t) => t.insert(0, 'current text'))
     const restore = replaceTextUpdate(state, 'old version')
     expect(textFromState(mergeUpdates([state, restore]))).toBe('old version')
+  })
+  it('a client catches up exactly what it missed with its state vector', () => {
+    const base = edit((t) => t.insert(0, 'abc'))
+    const missed = edit((t) => t.insert(3, 'XYZ'), base)
+    const server = mergeUpdates([base, missed])
+    const client = new Y.Doc()
+    Y.applyUpdate(client, base)
+    Y.applyUpdate(client, diffFromStateVector(server, Y.encodeStateVector(client)))
+    expect(client.getText('content').toString()).toBe('abcXYZ')
   })
 })

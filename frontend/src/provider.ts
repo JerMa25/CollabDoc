@@ -4,8 +4,9 @@
 //    server stores/charges it only once. An edit is only "accepted" when the server says so.
 //  - Remote edits and presence arrive through the WebSocket. Applying an update twice is a
 //    no-op in Yjs, so echoes of our own edits are harmless.
-//  - After every (re)connection the full state is fetched again, so nothing missed while
-//    offline is lost.
+//  - After every (re)connection, every 15 s, and as soon as a received edit depends on one we
+//    do not have, the client asks the server for what it is missing (Yjs state-vector diff).
+//    A lost WebSocket message is therefore caught up within seconds: everyone converges.
 import * as Y from 'yjs'
 import { Awareness, applyAwarenessUpdate, encodeAwarenessUpdate, removeAwarenessStates } from 'y-protocols/awareness'
 import { api, ApiError, cfg, fromB64, toB64, type Credit } from './api'
@@ -31,6 +32,8 @@ export class DocProvider {
   private destroyed = false
   private flushTimer?: ReturnType<typeof setTimeout>
   private awarenessTimer?: ReturnType<typeof setTimeout>
+  private resyncTimer?: ReturnType<typeof setInterval>
+  private resyncing = false
   private httpRetry = 500
   private wsRetry = 1000
 
@@ -115,7 +118,11 @@ export class DocProvider {
       } catch {
         return
       }
-      if (msg.type === 'update') Y.applyUpdate(this.doc, fromB64(msg.data), REMOTE)
+      if (msg.type === 'update') {
+        Y.applyUpdate(this.doc, fromB64(msg.data), REMOTE)
+        // An edit that depends on one we never received stays pending in Yjs: fetch the gap.
+        if ((this.doc.store as any).pendingStructs || (this.doc.store as any).pendingDs) void this.loadState()
+      }
       else if (msg.type === 'awareness') applyAwarenessUpdate(this.awareness, fromB64(msg.data), REMOTE)
       else if (msg.type === 'join') this.sendAwareness()
       else if (msg.type === 'leave' && typeof msg.cid === 'number') removeAwarenessStates(this.awareness, [msg.cid], REMOTE)
@@ -128,18 +135,25 @@ export class DocProvider {
     }
   }
 
+  /** Fetches the full state the first time, then only the part this client is missing. */
   private async loadState() {
+    if (this.resyncing) return
+    this.resyncing = true
     try {
-      const res = await api<{ state: string }>('GET', `/documents/${this.docId}/state`)
+      const sv = this.synced ? `?sv=${encodeURIComponent(toB64(Y.encodeStateVector(this.doc)))}` : ''
+      const res = await api<{ state: string }>('GET', `/documents/${this.docId}/state${sv}`)
       Y.applyUpdate(this.doc, fromB64(res.state), REMOTE)
       if (!this.synced) {
         this.synced = true
         this.ev.onSynced()
         this.scheduleFlush(0)
+        this.resyncTimer = setInterval(() => void this.loadState(), 15000)
       }
     } catch (e) {
       console.error('state load failed', e)
-      setTimeout(() => void this.loadState(), 2000)
+      if (!this.synced) setTimeout(() => void this.loadState(), 2000)
+    } finally {
+      this.resyncing = false
     }
   }
 
@@ -164,6 +178,7 @@ export class DocProvider {
     this.awareness.off('update', this.onAwarenessUpdate)
     clearTimeout(this.flushTimer)
     clearTimeout(this.awarenessTimer)
+    clearInterval(this.resyncTimer)
     this.ws?.close()
   }
 }
