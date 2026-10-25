@@ -69,8 +69,11 @@ Toute route `/documents/{docId}/…` exige d'être membre du document (sinon `40
 Le contenu d'un document est un **Y.Text nommé `content`** ([Yjs](https://docs.yjs.dev), CRDT).
 Un client :
 1. ouvre le WebSocket (§4) ;
-2. lit l'état complet : `GET /documents/{docId}/state` → `{ docId, rev, updates, state }`
-   où `state` est une mise à jour Yjs complète encodée en base64 (`Y.applyUpdate(doc, state)`) ;
+2. lit l'état complet : `GET /documents/{docId}/state` → `{ docId, rev, updates, state, diff }`
+   où `state` est une mise à jour Yjs complète encodée en base64 (`Y.applyUpdate(doc, state)`).
+   Avec `?sv=<vecteur d'état Yjs du client, base64>` (`Y.encodeStateVector(doc)`), seule la
+   partie **manquante** est renvoyée (`diff: true`) : le client s'en sert toutes les 15 s pour
+   rattraper une diffusion qu'il aurait manquée ;
 3. envoie chacune de ses modifications avec `POST /documents/{docId}/updates` ;
 4. applique les modifications des autres reçues par WebSocket.
 

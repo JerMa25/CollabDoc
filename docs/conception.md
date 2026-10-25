@@ -120,8 +120,14 @@ Robustesse :
 - **Réseau coupé pendant l'envoi** : le client renvoie avec le *même* `id` ; la condition
   `attribute_not_exists(updateId)` garantit un stockage unique, et la réponse est quand même
   `200` (`duplicate: true`).
-- **Diffusion WebSocket perdue** : sans gravité, l'état fusionné relu par le client la contient ;
-  et les doublons reçus sont sans effet (idempotence).
+- **Diffusion WebSocket perdue** (connexion coupée, limitation de débit d'API Gateway) : sans
+  gravité pour les données. Toutes les 15 s — et immédiatement si une modification reçue dépend
+  d'une autre absente — le client envoie son **vecteur d'état** Yjs (`GET /state?sv=…`) et le
+  serveur ne lui renvoie que ce qui lui manque. Toutes les copies finissent donc identiques, même
+  si des messages en direct se perdent. Les doublons reçus sont sans effet (idempotence).
+- **Débit de diffusion** : avec 50 personnes dans le même document, chaque modification part vers
+  50 connexions. Les tests ont montré que la limite de l'API WebSocket était atteinte ; elle a été
+  relevée, et un envoi limité est réessayé avec un délai aléatoire (voir rapport de test §7).
 
 *Alternatives écartées :*
 - *Dernier qui écrit gagne* (envoi du texte entier) : perd des modifications concurrentes.

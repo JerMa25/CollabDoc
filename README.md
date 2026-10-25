@@ -1,4 +1,4 @@
-# CollabDoc — éditeur de documents partagé sur AWS
+# CollabDoc - éditeur de documents partagé sur AWS
 
 Application web d'écriture à plusieurs : édition simultanée d'un même texte (avec présence et
 curseurs des autres rédacteurs), historique des versions avec restauration, liens de
@@ -32,7 +32,7 @@ samconfig.toml         paramètres de déploiement (nom de pile, région)
 backend/               fonctions Lambda (TypeScript, Node.js 22) + tests unitaires (Vitest)
 frontend/              application web (React + Vite, CodeMirror 6 + Yjs)
 tests/                 tests de bout en bout et de charge (Node.js, k6) — résultats bruts dans tests/results/
-scripts/               bootstrap.sh, deploy.sh, destroy.sh
+scripts/               bootstrap.sh, deploy.sh, destroy.sh, loadtest.sh (générateur de charge temporaire)
 docs/                  documentation
 ```
 
@@ -70,18 +70,27 @@ applicatifs sont lus dans SSM au démarrage.
 ## Tester
 
 ```bash
-# Tests unitaires (comptage des caractères, convergence CRDT, jetons, PDF)
+# Tests unitaires (comptage des caractères, propriétés CRDT, rattrapage, jetons, PDF)
 cd backend && npm test
 
 # Tests de bout en bout contre l'application déployée (lisent les URL dans la pile CloudFormation)
 cd tests && npm ci
-WRITERS=20 EDITS=25 node convergence/convergence.mjs   # contrainte 2
-MAX=50 CLICKS=1000  node load/claim-race.mjs           # contrainte 1
-DEVICES=8           node load/credit-multidevice.mjs   # contrainte 4 + blocage
+FRONT_URL=<FrontendUrl> node smoke.mjs                 # parcours complet de toutes les fonctions
+WRITERS=50 EDITS=20 node convergence/convergence.mjs   # contrainte 2
+MAX=100 CLICKS=3000 node load/claim-race.mjs           # contrainte 1
+DEVICES=10          node load/credit-multidevice.mjs   # contrainte 4 + blocage
+```
 
-# Pic de publication (contraintes 5 et 6) : 300 rédacteurs + 15 000 visiteurs
-WRITERS=300 DOCS=30 DURATION=300 node load/writers.mjs &        # rédacteurs en fond
-k6 run -e API_URL=<ApiUrl> -e FRONT_URL=<FrontendUrl> -e LINK_ID=<lien de 500> load/spike.js
+Pic de publication (contraintes 5 et 6 : 300 rédacteurs + 15 000 visiteurs). Il se lance depuis
+une machine temporaire **dans la même région** (un ordinateur personnel sature avant l'application),
+décrite dans [tests/load/loadgen.yaml](tests/load/loadgen.yaml) et pilotée par SSM (aucun port ouvert) :
+
+```bash
+./scripts/loadtest.sh up                        # crée la machine (~3 min, type autorisé par le plan gratuit)
+./scripts/loadtest.sh run 'bash load/peak.sh'   # rédacteurs + k6 en parallèle (~8 min)
+./scripts/loadtest.sh pull                      # rapatrie les résultats dans tests/results/
+tests/load/cloudwatch-metrics.sh <début UTC> <fin UTC> > tests/results/cloudwatch-<run>.json
+./scripts/loadtest.sh down                      # supprime la machine
 ```
 
 Chaque script écrit ses résultats bruts (JSON) dans `tests/results/` et affiche PASS/FAIL.
