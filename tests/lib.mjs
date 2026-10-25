@@ -46,12 +46,33 @@ export const b64 = (u) => Buffer.from(u).toString('base64')
 export const fromB64 = (s) => new Uint8Array(Buffer.from(s, 'base64'))
 export const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
-/** Applies `fn` to the Y.Text of `doc` and returns the resulting incremental update. */
+/**
+ * Applies `fn` to the Y.Text of `doc` and returns the update of THIS edit only, captured from the
+ * 'update' event exactly like the browser client does (frontend/src/provider.ts).
+ * (A state-vector diff would also carry other writers' updates that Yjs keeps pending, and the
+ * server would rightly charge them to this writer.)
+ */
 export function localEdit(doc, fn) {
-  const before = Y.encodeStateVector(doc)
-  fn(doc.getText('content'))
-  return Y.encodeStateAsUpdate(doc, before)
+  let out
+  const onUpdate = (update, origin) => {
+    if (origin === 'local') out = update
+  }
+  doc.on('update', onUpdate)
+  doc.transact(() => fn(doc.getText('content')), 'local')
+  doc.off('update', onUpdate)
+  return out ?? Y.encodeStateAsUpdate(new Y.Doc())
 }
+
+/** A random position between two markers (never inside one), so markers stay searchable. */
+export function boundary(text) {
+  const s = text.toString()
+  const cuts = [0, s.length]
+  for (let i = s.indexOf(']'); i !== -1; i = s.indexOf(']', i + 1)) cuts.push(i + 1)
+  return cuts[Math.floor(Math.random() * cuts.length)]
+}
+
+/** Occurrences of `marker` in `text`. */
+export const occurrences = (text, marker) => text.split(marker).length - 1
 
 /**
  * Sends an update like the real client does: same id on every retry, retry on network error,

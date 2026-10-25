@@ -1,0 +1,26 @@
+{ "window": { "start": "2026-10-24T22:31:00Z", "end": "2026-10-24T22:41:00Z" },
+  "lambda": {
+    "ApiFunction": { "invocations": 965, "errors": 0, "throttles": 0, "maxConcurrency": 25, "durationP99ms": 1310 },
+    "UpdateFunction": { "invocations": 79334, "errors": 0, "throttles": 0, "maxConcurrency": 75, "durationP99ms": 170.5 },
+    "ClaimFunction": { "invocations": 28165, "errors": 0, "throttles": 1127, "maxConcurrency": 100, "durationP99ms": 42.4 },
+    "AdminFunction": { "invocations": 0, "errors": 0, "throttles": 0, "maxConcurrency": 0, "durationP99ms": 0 },
+    "WsConnectFunction": { "invocations": 301, "errors": 0, "throttles": 0, "maxConcurrency": 16, "durationP99ms": 257.1 },
+    "WsDisconnectFunction": { "invocations": 301, "errors": 0, "throttles": 0, "maxConcurrency": 55, "durationP99ms": 435.3 },
+    "WsMessageFunction": { "invocations": 11, "errors": 0, "throttles": 0, "maxConcurrency": 1, "durationP99ms": 22.3 },
+    "NotifyFunction": { "invocations": 1, "errors": 0, "throttles": 0, "maxConcurrency": 1, "durationP99ms": 275.1 },
+    "SnapshotFunction": { "invocations": 1, "errors": 0, "throttles": 0, "maxConcurrency": 1, "durationP99ms": 32689.8 }
+  },
+  "httpApi": { "requests": 116368, "4xx": 34439, "5xx": 1127, "latencyP99ms": 647.4 },
+  "webSocketApi": { "messages": 786447, "connects": 301 },
+  "dynamodbThrottledRequests": {
+    "DocumentsTable": 0,
+    "MembersTable": 0,
+    "UpdatesTable": 0,
+    "CreditsTable": 0,
+    "ConnectionsTable": 0,
+    "LinksTable": 0,
+    "ClaimsTable": 0,
+    "VersionsTable": 0,
+    "AbuseTable": 0
+  }
+}

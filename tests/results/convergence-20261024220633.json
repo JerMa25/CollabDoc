@@ -1,0 +1,37 @@
+{
+  "test": "convergence",
+  "run": "20261024220633",
+  "docId": "afzWBYIp4CXB",
+  "params": {
+    "writers": 50,
+    "editsPerWriter": 20,
+    "spot": "same"
+  },
+  "durationMs": 11003,
+  "editsSent": 1000,
+  "editsAccepted": 1000,
+  "editsRejected": 0,
+  "rejectedDetail": [],
+  "retriesNeeded": 0,
+  "latencyMs": {
+    "count": 1000,
+    "p50": 234,
+    "p90": 1612,
+    "p99": 2027,
+    "max": 2215
+  },
+  "finalLength": 7300,
+  "acceptedMissingFromFinal": [],
+  "acceptedDuplicatedInFinal": [],
+  "liveCopiesDifferentFromServer": [],
+  "copiesDifferentAfterReload": [],
+  "broadcastsReceivedPerWriter": {
+    "count": 50,
+    "p50": 1000,
+    "p90": 1000,
+    "p99": 1000,
+    "max": 1000
+  },
+  "resyncPayloadBytesTotal": 200,
+  "PASS": true
+}

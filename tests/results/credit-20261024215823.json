@@ -1,0 +1,28 @@
+{
+  "test": "credit-multidevice",
+  "run": "20261024215823",
+  "params": {
+    "devices": 10,
+    "charsPerEdit": 400,
+    "limit": 10000
+  },
+  "acceptedChars": 10000,
+  "serverCreditUsed": 10000,
+  "statuses": {
+    "200": 25,
+    "403": 10
+  },
+  "firstRefusal": {
+    "error": "CREDIT_EXHAUSTED",
+    "message": "Daily write credit exhausted",
+    "chars": 400,
+    "credit": {
+      "used": 10000,
+      "limit": 10000,
+      "remaining": 0,
+      "resetsAt": "2026-10-25T00:00:00.000Z"
+    }
+  },
+  "blockedAfterExtraAttempts": 10,
+  "PASS": true
+}

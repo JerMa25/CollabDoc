@@ -1,0 +1,27 @@
+writers load run=20261024220833 writers=300 docs=30 duration=420s
+setup done, starting to write
+{
+  "test": "writers-load",
+  "run": "20261024220833",
+  "params": {
+    "writers": 300,
+    "docs": 30,
+    "durationSec": 420
+  },
+  "editsSent": 78356,
+  "statuses": {
+    "200": 71470,
+    "403": 532,
+    "423": 6354
+  },
+  "latencyMs": {
+    "count": 78356,
+    "p50": 69,
+    "p90": 126,
+    "p99": 387,
+    "max": 1187
+  },
+  "acceptedMissing": 33956,
+  "PASS": false
+}
+saved /opt/run/tests/results/writers-20261024220833.json

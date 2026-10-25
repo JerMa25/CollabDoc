@@ -6,7 +6,7 @@
 // Usage: WRITERS=300 DOCS=30 DURATION=300 node load/writers.mjs
 import WebSocket from 'ws'
 import * as Y from 'yjs'
-import { endpoints, fromB64, localEdit, must, percentiles, RUN, saveResult, sendUpdate, serverText, session, setupDoc, sleep } from '../lib.mjs'
+import { boundary, endpoints, fromB64, localEdit, must, occurrences, percentiles, RUN, saveResult, sendUpdate, serverText, session, setupDoc, sleep } from '../lib.mjs'
 
 const WRITERS = Number(process.env.WRITERS ?? 300)
 const DOCS = Number(process.env.DOCS ?? 30)
@@ -46,7 +46,7 @@ await Promise.all(
     Y.applyUpdate(ydoc, fromB64(state), 'remote')
     for (let j = 0; Date.now() < end; j++) {
       const marker = `[w${i}.${j}]`
-      const update = localEdit(ydoc, (t) => t.insert(Math.floor(Math.random() * (t.length + 1)), marker))
+      const update = localEdit(ydoc, (t) => t.insert(boundary(t), marker))
       const r = await sendUpdate(api, w.token, doc.docId, `l${RUN}-w${i}-${j}`, update)
       latencies.push(r.ms)
       statuses[r.status] = (statuses[r.status] ?? 0) + 1
@@ -57,10 +57,18 @@ await Promise.all(
   }),
 )
 
+// Every accepted edit must be in its document exactly once (constraint 2 under load).
 let missing = 0
+let duplicated = 0
+let accepted = 0
 for (const d of docs) {
   const text = await serverText(api, owner.token, d.docId)
-  missing += acceptedByDoc.get(d.docId).filter((m) => !text.includes(m)).length
+  for (const m of acceptedByDoc.get(d.docId)) {
+    const n = occurrences(text, m)
+    accepted++
+    if (n === 0) missing++
+    if (n > 1) duplicated++
+  }
 }
 const result = {
   test: 'writers-load',
@@ -69,8 +77,10 @@ const result = {
   editsSent: latencies.length,
   statuses,
   latencyMs: percentiles(latencies),
+  editsAccepted: accepted,
   acceptedMissing: missing,
+  acceptedDuplicated: duplicated,
 }
-result.PASS = missing === 0
+result.PASS = missing === 0 && duplicated === 0
 console.log(JSON.stringify(result, null, 2))
 console.log(`saved ${saveResult('writers', result)}`)

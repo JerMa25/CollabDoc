@@ -1,0 +1,24 @@
+{
+  "test": "writers-load",
+  "run": "20261024222247",
+  "params": {
+    "writers": 300,
+    "docs": 30,
+    "durationSec": 420
+  },
+  "editsSent": 79234,
+  "statuses": {
+    "200": 79234
+  },
+  "latencyMs": {
+    "count": 79234,
+    "p50": 65,
+    "p90": 106,
+    "p99": 252,
+    "max": 3074
+  },
+  "editsAccepted": 79234,
+  "acceptedMissing": 0,
+  "acceptedDuplicated": 0,
+  "PASS": true
+}

@@ -1,0 +1,8 @@
+# Runs archivés (gardés comme trace, non utilisés comme preuve finale)
+
+| Fichier(s) | Ce qui s'est passé | Correction |
+|---|---|---|
+| `convergence-20261024193423-before-fix.json` | 20 rédacteurs : la moitié ne recevait aucune diffusion WebSocket (connexions supprimées pendant leur `$connect`, API Gateway répondant « Gone »). Aucune modification perdue côté serveur. | Bug **application** : suppression d'une connexion « Gone » seulement si elle a plus de 30 s (`backend/src/lib/broadcast.ts`). |
+| `convergence-20261024215612-before-ws-fix.json` | 50 rédacteurs au même endroit : ~230 diffusions reçues sur 1 000 (`TooManyRequestsException` sur l'API de diffusion). Aucune modification perdue côté serveur. | Bug **application** : limite WebSocket relevée, nouvel essai en cas de limitation, resynchronisation périodique du client par vecteur d'état. |
+| `writers-20261024220833.*`, `k6-20261024220833.err` | k6 refuse un débit non entier (12,5/s) : aucun visiteur simulé. Côté rédacteurs, le script de test calculait ses modifications par différence d'état et embarquait les modifications des autres en attente : le serveur les a (à juste titre) décomptées du crédit → blocages ; vérification des marqueurs faussée par des insertions au milieu d'autres marqueurs. | Bugs du **harnais de test** : débit en 25 / 2 s ; modification capturée par l'événement `update` comme le vrai client ; insertion entre marqueurs et comptage exact. |
+| `writers-20261024222247.*`, `spike-summary-20261024222247.json` | Pic complet réussi mais 436 visiteurs non lancés par k6 (générateur à court d'utilisateurs virtuels). | Capacité de k6 augmentée (`MAX_VUS`). Run final : `*-20261024223158*`. |

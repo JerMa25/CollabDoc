@@ -1,0 +1,1 @@
+time="2026-10-24T22:08:57Z" level=error msg="could not initialize 'load/spike.js': could not load JS test 'file:///opt/run/tests/load/spike.js': parsing options from script got error while parsing \"\\\"scenarios\": json: cannot unmarshal number 12.5 into Go struct field Options.scenarios.stages.target of type int64"

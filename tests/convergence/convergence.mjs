@@ -10,7 +10,7 @@
 // Usage: WRITERS=20 EDITS=25 node convergence/convergence.mjs
 import WebSocket from 'ws'
 import * as Y from 'yjs'
-import { endpoints, fromB64, localEdit, must, percentiles, RUN, saveResult, sendUpdate, serverText, session, setupDoc, sleep } from '../lib.mjs'
+import { boundary, endpoints, fromB64, localEdit, must, percentiles, RUN, saveResult, sendUpdate, serverText, session, setupDoc, sleep } from '../lib.mjs'
 
 const WRITERS = Number(process.env.WRITERS ?? 20)
 const EDITS = Number(process.env.EDITS ?? 25)
@@ -52,7 +52,7 @@ await Promise.all(
   bots.map(async (bot) => {
     for (let j = 0; j < EDITS; j++) {
       const marker = `<b${bot.i}e${j}>`
-      const update = localEdit(bot.ydoc, (t) => t.insert(SPOT === 'same' ? 0 : Math.floor(Math.random() * (t.length + 1)), marker))
+      const update = localEdit(bot.ydoc, (t) => t.insert(SPOT === 'same' ? 0 : boundary(t), marker))
       const r = await sendUpdate(api, bot.w.token, docId, `t${RUN}-b${bot.i}-e${j}`, update)
       bot.latencies.push(r.ms)
       ;(r.accepted ? bot.accepted : bot.rejected).push({ marker, status: r.status, attempts: r.attempts })
@@ -70,8 +70,15 @@ const missing = accepted.filter((m) => !final.includes(m))
 const duplicated = accepted.filter((m) => final.split(m).length - 1 > 1)
 const liveDiffers = bots.filter((b) => b.ydoc.getText('content').toString() !== final).map((b) => b.i)
 
-// (c) eventual convergence: reload from the server (what a reconnecting client does).
-for (const b of bots) Y.applyUpdate(b.ydoc, fromB64((await must(api, 'GET', `/documents/${docId}/state`, undefined, b.w.token)).state), 'remote')
+// (c) eventual convergence: each copy asks the server for what it is missing (state-vector
+// diff), exactly like the real client does every 15 s.
+let resyncBytes = 0
+for (const b of bots) {
+  const sv = Buffer.from(Y.encodeStateVector(b.ydoc)).toString('base64')
+  const { state } = await must(api, 'GET', `/documents/${docId}/state?sv=${encodeURIComponent(sv)}`, undefined, b.w.token)
+  resyncBytes += state.length
+  Y.applyUpdate(b.ydoc, fromB64(state), 'remote')
+}
 const afterReloadDiffers = bots.filter((b) => b.ydoc.getText('content').toString() !== final).map((b) => b.i)
 bots.forEach((b) => b.socket.close())
 
@@ -93,6 +100,7 @@ const result = {
   liveCopiesDifferentFromServer: liveDiffers,
   copiesDifferentAfterReload: afterReloadDiffers,
   broadcastsReceivedPerWriter: percentiles(bots.map((b) => b.received())),
+  resyncPayloadBytesTotal: resyncBytes,
 }
 result.PASS = missing.length === 0 && duplicated.length === 0 && afterReloadDiffers.length === 0
 console.log(JSON.stringify(result, null, 2))

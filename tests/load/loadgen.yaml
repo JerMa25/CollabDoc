@@ -1,0 +1,93 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  CollabDoc - TEMPORARY load generator for the peak test (constraints 5 & 6).
+  One EC2 instance in the same region as the application, driven through SSM Run Command
+  (no SSH key, no inbound port). Delete the stack right after the tests: scripts/loadtest.sh down.
+
+Parameters:
+  InstanceType:
+    Type: String
+    Default: m7i-flex.large # 2 vCPU / 8 GiB - largest type allowed by the AWS Free plan
+  AmiId:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64
+
+Resources:
+  ArtifactsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      Tags: [{ Key: project, Value: collabdoc-loadtest }]
+
+  Role:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal: { Service: ec2.amazonaws.com }
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore # SSM Run Command / Session Manager
+      Policies:
+        - PolicyName: artifacts
+          PolicyDocument:
+            Statement:
+              - Effect: Allow
+                Action: [s3:GetObject, s3:PutObject]
+                Resource: !Sub ${ArtifactsBucket.Arn}/*
+      Tags: [{ Key: project, Value: collabdoc-loadtest }]
+
+  InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles: [!Ref Role]
+
+  SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Load generator - outbound only, no inbound rule
+      Tags: [{ Key: project, Value: collabdoc-loadtest }]
+
+  Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Ref AmiId
+      InstanceType: !Ref InstanceType
+      IamInstanceProfile: !Ref InstanceProfile
+      SecurityGroupIds: [!GetAtt SecurityGroup.GroupId]
+      InstanceInitiatedShutdownBehavior: terminate
+      MetadataOptions: { HttpTokens: required }
+      BlockDeviceMappings:
+        - DeviceName: /dev/xvda
+          Ebs: { VolumeSize: 16, VolumeType: gp3, DeleteOnTermination: true, Encrypted: true }
+      Tags:
+        - { Key: Name, Value: collabdoc-loadgen }
+        - { Key: project, Value: collabdoc-loadtest }
+      UserData:
+        Fn::Base64: |
+          #!/bin/bash
+          set -eux
+          # Safety net: the machine shuts itself down (=> terminated) after 4 hours whatever happens.
+          shutdown -h +240
+          dnf install -y nodejs npm tar gzip
+          TAG=$(curl -s https://api.github.com/repos/grafana/k6/releases/latest | grep -m1 '"tag_name"' | cut -d'"' -f4)
+          curl -sSL "https://github.com/grafana/k6/releases/download/${TAG}/k6-${TAG}-linux-amd64.tar.gz" | tar xz -C /tmp
+          install /tmp/k6-${TAG}-linux-amd64/k6 /usr/local/bin/k6
+          cat >> /etc/security/limits.conf <<'EOF'
+          * soft nofile 200000
+          * hard nofile 200000
+          EOF
+          sysctl -w net.ipv4.ip_local_port_range="1024 65000"
+          sysctl -w net.ipv4.tcp_tw_reuse=1
+          touch /var/tmp/loadgen-ready
+
+Outputs:
+  InstanceId:
+    Value: !Ref Instance
+  BucketName:
+    Value: !Ref ArtifactsBucket

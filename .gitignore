@@ -5,3 +5,5 @@ dist/
 .env
 .env.*
 samconfig.local.toml
+!tests/results/**/*.log
+!tests/results/*.log

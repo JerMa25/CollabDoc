@@ -1,0 +1,33 @@
+{
+  "test": "claim-race",
+  "run": "20261024215802",
+  "linkId": "Qd5kFnaDFtU",
+  "params": {
+    "maxDownloads": 100,
+    "simultaneousClicks": 3000
+  },
+  "durationMs": 12391,
+  "byStatus": {
+    "0": 883,
+    "200": 100,
+    "410": 1290,
+    "429": 5,
+    "503": 722
+  },
+  "successes": 100,
+  "distinctCopyNumbers": 100,
+  "copyNumbersRange": [
+    1,
+    100
+  ],
+  "remainingAfter": 0,
+  "latencyMs": {
+    "count": 3000,
+    "p50": 2756,
+    "p90": 9811,
+    "p99": 9922,
+    "max": 9950
+  },
+  "PASS": true,
+  "NOTE": "all copies taken"
+}
