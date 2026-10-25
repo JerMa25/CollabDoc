@@ -24,7 +24,7 @@ export const config = {
   get wsEndpoint() { return env('WS_ENDPOINT') },
   get sessionSecretParam() { return env('SESSION_SECRET_PARAM') },
   get adminTokenParam() { return env('ADMIN_TOKEN_PARAM') },
-  get notificationSender() { return env('NOTIFICATION_SENDER') },
+  get notificationTopicArn() { return env('NOTIFICATION_TOPIC_ARN') },
   get frontendUrl() { return process.env.FRONTEND_URL ?? '' },
 }
 

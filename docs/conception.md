@@ -32,7 +32,7 @@ riche du texte (le sujet parle d'« un simple texte »), nom de domaine personna
       │                                                │
       ▼                                                │
  DynamoDB (9 tables, à la demande) ────────────────────┘
-   Links ──stream (remaining 1→0)──► NotifyFunction ──► SES (e-mail au créateur)
+   Links ──stream (remaining 1→0)──► NotifyFunction ──► SNS (e-mail au créateur)
  S3 « data » : pdf/<doc>/<rev>.pdf (cache des PDF), versions/<doc>/<id>.txt
  EventBridge Scheduler (10 min) ──► SnapshotFunction (versions automatiques)
  SSM Parameter Store : secret de signature des sessions, jeton admin (SecureString)
@@ -219,7 +219,16 @@ pour étaler les nouvelles tentatives au lieu de les synchroniser.
 - Le créateur du lien reçoit un e-mail : le *stream* DynamoDB de la table `Links` déclenche
   `NotifyFunction`, avec un filtre sur la transition `remaining 1 → 0` (un seul événement).
   L'e-mail est hors du chemin du téléchargement : un échec d'envoi ne bloque aucun visiteur, et
-  la fonction de téléchargement n'a aucun droit SES.
+  la fonction de téléchargement n'a aucun droit d'envoi.
+- **Canal d'envoi : Amazon SNS plutôt que SES.** La première version utilisait SES, mais sans
+  nom de domaine à soi, SES doit envoyer « depuis » une adresse Gmail : les contrôles
+  anti-usurpation de Gmail (DMARC) font alors classer le message en spam ou le rejeter, et le
+  mode *sandbox* de SES refuse tout destinataire non vérifié. Constaté en démonstration : un
+  e-mail « envoyé » non reçu, un autre refusé. SNS envoie depuis `no-reply@sns.amazonaws.com`
+  vers n'importe quelle adresse. Un seul sujet SNS pour l'application ; à la création d'un lien,
+  le créateur y est abonné avec une **politique de filtre** sur l'attribut `creator` (il ne reçoit
+  que les notifications de ses propres liens). Contrepartie assumée : AWS exige que le
+  destinataire confirme son abonnement une fois (lien dans un premier e-mail), règle anti-spam.
 
 ## 4. Fonctionnalités
 
@@ -260,8 +269,9 @@ au repos.
   dans SSM Parameter Store (SecureString chiffré KMS), jamais écrits sur disque.
 - **Moindre privilège** : un rôle par fonction, limité aux actions et ressources utilisées.
   Exemples : `ClaimFunction` peut seulement lire/décrémenter `Links`, écrire dans `Claims`,
-  lire `Documents`/`Updates` et lire/écrire `pdf/*` dans S3 — rien sur les crédits, SES ou
-  SSM. `NotifyFunction` ne peut qu'envoyer un e-mail depuis l'adresse expéditrice configurée.
+  lire `Documents`/`Updates` et lire/écrire `pdf/*` dans S3 — rien sur les crédits, les
+  notifications ou SSM. `NotifyFunction` ne peut que publier sur le sujet SNS de l'application ;
+  `ApiFunction` ne peut qu'y abonner un créateur de lien.
   `AdminFunction` est en lecture seule.
 - Buckets S3 privés (*Block Public Access*), chiffrés, HTTPS obligatoire ; le site n'est
   lisible que par CloudFront (Origin Access Control).
@@ -286,7 +296,7 @@ au repos.
 | Limite | Impact | Évolution |
 |---|---|---|
 | L'historique `Updates` d'un document n'est jamais compacté | La lecture de l'état grossit avec le nombre de modifications | Compacter périodiquement en un instantané Yjs stocké dans S3 |
-| SES en mode *sandbox* | E-mails seulement vers des adresses vérifiées | Demander l'accès production SES |
+| Confirmation d'abonnement SNS | Le créateur d'un lien doit cliquer une fois sur l'e-mail d'AWS pour être prévenu | Avec un nom de domaine : SES (DKIM/SPF) en accès production, sans confirmation |
 | Identité déclarative | Usurpation d'e-mail possible | Amazon Cognito |
 | Diffusion à N connexions par une seule Lambda | Coût linéaire en nombre de participants d'un même document | Suffisant pour quelques dizaines de rédacteurs par document |
 | Jour de crédit = jour UTC | Recharge à 01:00 heure du Cameroun | Paramétrer le fuseau |

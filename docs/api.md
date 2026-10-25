@@ -145,8 +145,11 @@ qui remplace le texte (diffusée à tous comme une modification normale, sans co
 { "maxDownloads": 500 }
 // 201
 { "linkId": "Xk3_9aQ2bLk", "docId": "…", "docTitle": "Journal", "maxDownloads": 500,
-  "remaining": 500, "creatorEmail": "…", "createdAt": "…" }
+  "remaining": 500, "creatorEmail": "…", "createdAt": "…", "notification": "pending" }
 ```
+`notification` indique si le créateur sera prévenu par e-mail au dernier téléchargement (Amazon SNS) :
+`confirmed` (abonnement actif), `pending` (AWS vient d'envoyer à `creatorEmail` un e-mail
+« Subscription Confirmation » à confirmer une fois), `unavailable` (le lien fonctionne, sans e-mail).
 `GET /documents/{docId}/links` → `{ links: [...] }`. Page publique : `<FrontendUrl>/#/d/<linkId>`.
 
 ### Statut (public) — `GET /links/{linkId}` ou `GET <FrontendUrl>/public/links/{linkId}`

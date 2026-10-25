@@ -10,4 +10,4 @@ for b in "$(out FrontendBucketName)" "$(out DataBucketName)"; do
 done
 sam delete --stack-name "$STACK" --region "$REGION" --no-prompts
 aws ssm delete-parameters --region "$REGION" --names /collabdoc/session-secret /collabdoc/admin-token >/dev/null || true
-echo "Stack, buckets and secrets deleted. (The SES identity is kept; remove it in SES if you want.)"
+echo "Stack, buckets, notification topic (and its subscriptions) and secrets deleted."

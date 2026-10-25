@@ -11,6 +11,7 @@ import { ddb, queryAll } from '../lib/ddb'
 import { getDocument, loadDocState } from '../lib/docstate'
 import { b64, fromB64, HttpError, json, parseBody, pathParam, wrap, type HttpEvent, type HttpResult } from '../lib/http'
 import { diffFromStateVector } from '../lib/yjs'
+import { ensureSubscribed } from '../lib/notifications'
 import { getSecret } from '../lib/secrets'
 import { createVersion, getVersionText, listVersions, restoreVersion } from '../lib/versions'
 
@@ -156,7 +157,10 @@ const routes: Record<string, Route> = {
       createdAt: new Date().toISOString(),
     }
     await ddb.send(new PutCommand({ TableName: TABLES.links, Item: link, ConditionExpression: 'attribute_not_exists(linkId)' }))
-    return json(201, { ...link, url: config.frontendUrl ? `${config.frontendUrl}/#/d/${link.linkId}` : undefined })
+    // The creator will be e-mailed when the last copy is taken: make sure they are subscribed
+    // ('pending' = AWS has just sent them a confirmation e-mail to click once).
+    const notification = await ensureSubscribed(writer.email)
+    return json(201, { ...link, notification, url: config.frontendUrl ? `${config.frontendUrl}/#/d/${link.linkId}` : undefined })
   },
 
   'GET /documents/{docId}/links': async (event) => {

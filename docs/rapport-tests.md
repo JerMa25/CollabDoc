@@ -185,9 +185,12 @@ le document stocké était complet ; seul l'affichage en direct était en retard
   max 1,66), mais un test à plus grande échelle demanderait plusieurs générateurs.
 - Les rédacteurs simulés écrivent des marqueurs, pas un texte réaliste ; le volume (environ
   190 modifications/s) est en revanche supérieur à celui de 300 humains.
-- L'e-mail de dernier téléchargement a été vérifié avec une adresse réelle vérifiée dans SES ;
-  pendant les tests de charge, les adresses fictives sont refusées par le *sandbox* SES (refus
-  journalisé, sans effet sur le téléchargement).
+- E-mail de dernier téléchargement : pendant les tests de charge (version SES), la fonction s'est
+  déclenchée exactement une fois par lien épuisé, mais les adresses fictives étaient refusées par
+  le *sandbox* SES. En démonstration, un e-mail vers une adresse Gmail a été accepté par SES sans
+  arriver (contrôles anti-usurpation de Gmail), un autre refusé (adresse non vérifiée). L'envoi
+  passe désormais par Amazon SNS (voir dossier de conception §3.7) ; vérifié de bout en bout
+  avec une adresse réelle (§10).
 - Effet observé de l'absence de compaction de l'historique : la création automatique de versions
   a pris jusqu'à 33 s sur des documents de ~2 600 modifications (voir limites, dossier de
   conception §8).

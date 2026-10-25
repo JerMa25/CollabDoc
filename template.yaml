@@ -5,9 +5,6 @@ Description: >
   Single region. Every function has its own IAM role limited to what it uses.
 
 Parameters:
-  NotificationSender:
-    Type: String
-    Description: SES-verified e-mail address used as sender of the "last download" e-mail
   SessionSecretParam:
     Type: String
     Default: /collabdoc/session-secret
@@ -55,7 +52,7 @@ Globals:
         WS_ENDPOINT: !Sub https://${WebSocketApi}.execute-api.${AWS::Region}.amazonaws.com/prod
         SESSION_SECRET_PARAM: !Ref SessionSecretParam
         ADMIN_TOKEN_PARAM: !Ref AdminTokenParam
-        NOTIFICATION_SENDER: !Ref NotificationSender
+        NOTIFICATION_TOPIC_ARN: !Ref LinkNotificationTopic
 
 Resources:
   # ---------------------------------------------------------------- logs
@@ -208,6 +205,13 @@ Resources:
       TimeToLiveSpecification: { AttributeName: ttl, Enabled: true }
       Tags: [{ Key: project, Value: collabdoc }]
 
+  # "Last download" e-mails (SNS rather than SES: no own domain, see backend/src/lib/notifications.ts)
+  LinkNotificationTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      DisplayName: CollabDoc
+      Tags: [{ Key: project, Value: collabdoc }]
+
   # ---------------------------------------------------------------- HTTP API
   HttpApi:
     Type: AWS::Serverless::HttpApi
@@ -336,6 +340,9 @@ Resources:
             - Effect: Allow
               Action: [s3:GetObject, s3:PutObject]
               Resource: !Sub ${DataBucket.Arn}/versions/*
+            - Effect: Allow
+              Action: [sns:Subscribe, sns:ListSubscriptionsByTopic]
+              Resource: !Ref LinkNotificationTopic
             - Effect: Allow
               Action: execute-api:ManageConnections
               Resource: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApi}/prod/POST/@connections/*
@@ -497,7 +504,7 @@ Resources:
   NotifyFunction:
     Type: AWS::Serverless::Function
     Properties:
-      Description: E-mails the link creator when the last copy is taken (DynamoDB stream)
+      Description: E-mails the link creator (SNS) when the last copy is taken (DynamoDB stream)
       CodeUri: backend/dist/notify
       Environment:
         Variables:
@@ -505,9 +512,8 @@ Resources:
       Policies:
         - Statement:
             - Effect: Allow
-              Action: ses:SendEmail
-              Resource: !Sub arn:aws:ses:${AWS::Region}:${AWS::AccountId}:identity/*
-              Condition: { StringEquals: { 'ses:FromAddress': !Ref NotificationSender } }
+              Action: sns:Publish
+              Resource: !Ref LinkNotificationTopic
       Events:
         LastCopy:
           Type: DynamoDB

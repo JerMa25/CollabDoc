@@ -16,7 +16,7 @@ tableau de bord pour l'association, e-mail au créateur d'un lien lors du dernie
 
 ```
 Navigateur ──CloudFront──► S3 (site statique React)            /public/* ─► statut de lien (cache 2 s)
-   │ HTTPS  ──► API Gateway HTTP ──► Lambda (api, update, claim, admin) ──► DynamoDB ──stream──► Lambda notify ──► SES
+   │ HTTPS  ──► API Gateway HTTP ──► Lambda (api, update, claim, admin) ──► DynamoDB ──stream──► Lambda notify ──► SNS (e-mail)
    │ WSS    ──► API Gateway WebSocket ──► Lambda (connect, disconnect, message)
    └ PDF   ◄── URL S3 pré-signée (60 s) ◄── S3 (pdf/, versions/)          EventBridge Scheduler ──► Lambda snapshot (10 min)
 ```
@@ -42,9 +42,9 @@ docs/                  documentation
   `aws login --region eu-north-1` (identifiants temporaires obtenus via la console).
 - AWS CLI v2 (≥ 2.32), AWS SAM CLI, Node.js ≥ 20, npm, `openssl`.
 - Pour les tests de charge : [k6](https://grafana.com/docs/k6/latest/set-up/install-k6/).
-- Une adresse e-mail **vérifiée dans Amazon SES** (expéditeur des notifications). En mode
-  *sandbox* SES, les destinataires doivent aussi être vérifiés :
-  `aws sesv2 create-email-identity --email-identity vous@exemple.com` puis cliquer le lien reçu.
+- Rien à préparer pour les e-mails : ils passent par Amazon SNS. À la création de son premier
+  lien, un rédacteur reçoit un e-mail « AWS Notification - Subscription Confirmation » à confirmer
+  une fois ; il est ensuite prévenu à chaque dernier téléchargement de ses liens.
 
 ## Déployer
 
@@ -53,7 +53,7 @@ docs/                  documentation
 ./scripts/bootstrap.sh
 
 # 2. Construction + tests unitaires + déploiement de l'infrastructure + mise en ligne du site
-NOTIFY_EMAIL=vous@exemple.com ./scripts/deploy.sh
+./scripts/deploy.sh
 ```
 
 Le script affiche à la fin l'URL du site (CloudFront), de l'API et du WebSocket.
@@ -103,8 +103,8 @@ La méthode et l'analyse sont dans [docs/rapport-tests.md](docs/rapport-tests.md
 ```
 
 Vide les deux buckets S3, supprime la pile CloudFormation (tables, fonctions, API, CloudFront…)
-et les secrets SSM. L'identité SES et le bucket de déploiement créé par SAM
-(`aws-sam-cli-managed-default`) peuvent être supprimés à la main si besoin.
+le sujet SNS et ses abonnements, et les secrets SSM. Le bucket de déploiement créé par SAM
+(`aws-sam-cli-managed-default`) peut être supprimé à la main si besoin.
 
 ## Développement local du frontend
 

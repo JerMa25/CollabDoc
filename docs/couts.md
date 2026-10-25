@@ -49,7 +49,7 @@ Prix relevés avec `aws pricing get-products` (région EU Stockholm) :
 | DynamoDB à la demande | 0,67 $ / million d'unités d'écriture ; 0,1345 $ / million d'unités de lecture |
 | Lambda (arm64) | dans le niveau toujours gratuit (1 M requêtes, 400 000 Go-s / mois) |
 | EC2 m7i-flex.large | 0,10175 $ / heure |
-| CloudFront, S3, SES, SSM (standard), CloudWatch Logs | volumes négligeables ou dans les niveaux gratuits |
+| CloudFront, S3, SNS (1 000 e-mails/mois gratuits), SSM (standard), CloudWatch Logs | volumes négligeables ou dans les niveaux gratuits |
 
 ### 3.1 Le test de pic (le poste principal)
 

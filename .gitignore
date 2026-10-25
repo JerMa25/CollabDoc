@@ -7,3 +7,4 @@ dist/
 samconfig.local.toml
 !tests/results/**/*.log
 !tests/results/*.log
+.~lock.*#

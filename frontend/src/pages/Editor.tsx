@@ -374,8 +374,14 @@ function LinksPanel({ docId, toast }: { docId: string; toast: Toast }) {
   const create = async (e: FormEvent) => {
     e.preventDefault()
     try {
-      await api('POST', `/documents/${docId}/links`, { maxDownloads: max })
+      const link = await api<{ notification?: string; creatorEmail: string }>('POST', `/documents/${docId}/links`, { maxDownloads: max })
       toast('Lien créé.', 'success')
+      if (link.notification === 'pending')
+        toast(
+          `Pour être prévenu du dernier téléchargement : ouvrez l'e-mail « AWS Notification - Subscription Confirmation » reçu sur ${link.creatorEmail} et cliquez « Confirm subscription » (une seule fois).`,
+          'info',
+        )
+      else if (link.notification === 'unavailable') toast("Le lien fonctionne, mais l'e-mail de dernier téléchargement n'a pas pu être activé.", 'error')
       await load()
     } catch (err: any) {
       toast(err.message, 'error')

@@ -114,7 +114,7 @@ export function useToasts() {
   const push = useCallback((text: string, kind: Toast['kind'] = 'info') => {
     const id = Date.now() + Math.random()
     setToasts((t) => [...t.slice(-3), { id, text, kind }])
-    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), kind === 'error' ? 8000 : 4000)
+    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), kind === 'error' || text.length > 120 ? 12000 : 4000)
   }, [])
   const dismiss = (id: number) => setToasts((t) => t.filter((x) => x.id !== id))
   const view = (
