@@ -1,0 +1,851 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Reproduire CollabDoc sur AWS</title>
+<style>
+@page {
+  size: A4;
+  margin: 18mm 17mm 20mm 17mm;
+  @bottom-center { content: "CollabDoc · Reproduire le projet sur AWS   " counter(page) " / " counter(pages); font: 8pt "DejaVu Sans", sans-serif; color: #8a8f99; }
+}
+@page :first { @bottom-center { content: "CollabDoc · Reproduire le projet sur AWS   " counter(page) " / " counter(pages); } }
+html { font-family: "DejaVu Serif", Georgia, serif; font-size: 9.6pt; line-height: 1.5; color: #1d2330; }
+h1, h2, h3, .crumb, .tag, .box-title, .cmd-title, table, .badge { font-family: "DejaVu Sans", Arial, sans-serif; }
+.crumb { font-size: 8pt; color: #6b7280; margin-bottom: 4pt; }
+.crumb b { color: #1f4e8c; }
+h1 { font-size: 19pt; color: #14233c; margin: 0 0 6pt; letter-spacing: -0.3pt; }
+.tags { margin-bottom: 12pt; }
+.tag { display: inline-block; font-size: 7.5pt; padding: 1.5pt 6pt; border-radius: 3pt; margin-right: 4pt; background: #1f4e8c; color: #fff; }
+.tag.light { background: #e8eef7; color: #1f4e8c; }
+h2 { font-size: 13pt; color: #1f4e8c; margin: 18pt 0 6pt; padding-bottom: 3pt; border-bottom: 1px solid #d5dbe5; page-break-after: avoid; }
+h3 { font-size: 10.5pt; color: #14233c; margin: 12pt 0 4pt; page-break-after: avoid; }
+p { margin: 0 0 6pt; text-align: justify; hyphens: auto; }
+h3 + p, h2 + p { break-before: avoid; }
+ol, ul { margin: 0 0 6pt; padding-left: 16pt; }
+li { margin-bottom: 2.5pt; }
+code { font-family: "DejaVu Sans Mono", monospace; font-size: 8.2pt; background: #f1f3f6; padding: 0.5pt 2.5pt; border-radius: 2pt; }
+.k { font-family: "DejaVu Sans", sans-serif; font-size: 8.3pt; background: #eef1f5; border: 1px solid #cfd6e0; border-radius: 3pt; padding: 0 4pt; white-space: nowrap; }
+.cmd { border: 1px solid #cfd6e0; border-radius: 4pt; margin: 6pt 0 9pt; page-break-inside: avoid; }
+.cmd-title { font-size: 7.6pt; font-weight: bold; color: #4b5563; background: #eef1f5; padding: 2.5pt 8pt; border-bottom: 1px solid #cfd6e0; border-radius: 4pt 4pt 0 0; }
+.cmd pre { margin: 0; padding: 6pt 8pt; font-family: "DejaVu Sans Mono", monospace; font-size: 7.8pt; line-height: 1.42; white-space: pre-wrap; word-break: break-all; }
+.cmd pre .out { color: #6b7280; }
+.box { border-radius: 4pt; padding: 7pt 10pt; margin: 8pt 0 10pt; page-break-inside: avoid; }
+.box-title { font-size: 7.6pt; font-weight: bold; letter-spacing: 0.4pt; margin-bottom: 3pt; }
+.box p { text-align: left; }
+.box p:last-child, .box ul:last-child, .box ol:last-child { margin-bottom: 0; }
+.astuce { background: #eaf6ee; border-left: 3pt solid #2e8b57; } .astuce .box-title { color: #2e7d4f; }
+.remarque { background: #f3f4f6; border-left: 3pt solid #8a8f99; } .remarque .box-title { color: #4b5563; }
+.facture { background: #fff6e5; border-left: 3pt solid #d88a00; } .facture .box-title { color: #a86400; }
+.contrainte { background: #eef0ff; border-left: 3pt solid #4f46e5; break-after: avoid; } .contrainte .box-title { color: #4338ca; }
+.attention { background: #fdecea; border-left: 3pt solid #c0392b; } .attention .box-title { color: #a93226; }
+table { width: 100%; border-collapse: collapse; font-size: 8.1pt; margin: 6pt 0 10pt; page-break-inside: avoid; }
+th { background: #1f4e8c; color: #fff; text-align: left; padding: 3.5pt 5pt; font-weight: bold; }
+td { padding: 3.5pt 5pt; border-bottom: 1px solid #e1e5ec; vertical-align: top; }
+tr:nth-child(even) td { background: #f8f9fb; }
+.fig { margin: 8pt 0 10pt; text-align: center; page-break-inside: avoid; }
+.caption { font-family: "DejaVu Sans", sans-serif; font-size: 7.6pt; color: #6b7280; text-align: left; margin-top: 3pt; }
+.caption b { color: #1d2330; }
+sup.fn { font-size: 6.5pt; color: #1f4e8c; }
+.sources { font-size: 7.8pt; }
+.sources li { margin-bottom: 3pt; word-break: break-all; }
+.ok { color: #1e7d46; font-weight: bold; } .no { color: #b42318; font-weight: bold; }
+.lead { font-size: 10pt; }
+.break { page-break-before: always; }
+.box pre { white-space: pre-wrap; word-break: break-all; }
+</style>
+</head>
+<body>
+<div class="crumb"><b>Projet d'évaluation</b> · Éditeur de documents partagé · Guide pour reproduire le projet</div>
+<h1>Construire CollabDoc sur AWS, du compte vide à la soutenance</h1>
+<div class="tags"><span class="tag">Un week-end</span><span class="tag">Plan gratuit AWS</span><span class="tag light">Une seule région : eu-north-1</span><span class="tag light">AWS SAM · Lambda · DynamoDB</span></div>
+
+<p class="lead">Ce document raconte, dans l'ordre où il a été réalisé, la construction du projet CollabDoc : un éditeur de textes à plusieurs, déployé sur AWS, dont les liens de téléchargement PDF ne délivrent jamais un exemplaire de trop. Il est écrit pour qu'un développeur <b>qui n'a jamais utilisé AWS</b> puisse refaire le même projet en suivant les étapes une à une.</p>
+
+<p>Tout ce qui touche à AWS est détaillé : les comptes, les outils à installer, chaque commande, chaque fichier de configuration et chaque bloc du modèle d'infrastructure. Le code de l'interface (frontend) et des fonctions (backend) n'est <b>pas</b> détaillé. C'est votre part du travail, et le rendu visuel vous appartient. Le guide dit en revanche, pour chaque partie du code, <b>ce qu'elle doit faire</b> pour que les contraintes du sujet soient tenues. Chaque choix est justifié par une consigne du sujet.</p>
+
+<div class="box remarque"><div class="box-title">CONVENTIONS DE LECTURE</div>
+<ul>
+<li>Les blocs <b>Terminal</b> se tapent dans le terminal de votre ordinateur, à la racine du projet sauf mention contraire. Les lignes grises sont des exemples de sortie.</li>
+<li>Les encadrés <b>CONSIGNE</b> rattachent l'étape à une phrase du sujet. Les encadrés <b>PIÈGE</b> décrivent un problème réellement rencontré pendant le projet, et sa solution.</li>
+<li>La région utilisée est <code>eu-north-1</code> (Stockholm). Si votre compte est dans une autre région, remplacez-la partout et faites <code>export AWS_REGION=&lt;votre-région&gt;</code> avant de lancer les scripts.</li>
+</ul></div>
+
+<h3>Les consignes du sujet, et comment ce guide y renvoie</h3>
+<table>
+<tr><th style="width:12%">Repère</th><th>Ce que dit le sujet</th></tr>
+<tr><td><b>C1</b></td><td>Un lien permet exactement le nombre de téléchargements autorisé, jamais un de plus, quel que soit le nombre de clics simultanés.</td></tr>
+<tr><td><b>C2</b></td><td>Aucune modification acceptée n'est perdue, et tous les participants finissent par voir le même document, même en écrivant au même endroit.</td></tr>
+<tr><td><b>C3</b></td><td>Un lien créé à T et utilisé à T1 donne le document tel qu'il est à T1, sans nouveau lien.</td></tr>
+<tr><td><b>C4</b></td><td>Un rédacteur n'écrit jamais plus que son crédit du jour (10 000 caractères), même depuis plusieurs appareils.</td></tr>
+<tr><td><b>C5</b></td><td>15 000 visiteurs (80 % dans la première minute) pendant que 300 rédacteurs écrivent : chaque visiteur obtient une réponse (télécharger, patienter ou épuisé).</td></tr>
+<tr><td><b>C6</b></td><td>Après le dernier exemplaire, les visiteurs l'apprennent vite, et l'application cesse de délivrer le service.</td></tr>
+<tr><td><b>R-Compte</b></td><td>Votre propre compte AWS, en plan gratuit, toutes les ressources dans une seule région.</td></tr>
+<tr><td><b>R-Clés</b></td><td>Aucune clé d'accès AWS dans le code ou le dépôt.</td></tr>
+<tr><td><b>R-Droits</b></td><td>Chaque composant n'a que les droits dont il a besoin.</td></tr>
+<tr><td><b>R-S3</b></td><td>Les fichiers à télécharger sont conservés dans S3.</td></tr>
+<tr><td><b>R-Pratiques</b></td><td>Appliquer les bonnes pratiques vues en cours.</td></tr>
+<tr><td><b>Livrables</b></td><td>Dépôt Git (code, infrastructure, tests, README), dossier de conception, rapport de test, description de l'API, preuve des coûts.</td></tr>
+</table>
+<p>Le sujet insiste : <i>« une application simple, mais dont chaque choix est compris et justifié »</i>. C'est pourquoi chaque étape ci-dessous dit pourquoi elle existe.</p>
+
+<!-- ======================================================================= -->
+<h2 class="break">1. Vendredi soir : traduire le sujet en mécanismes AWS</h2>
+<p>Avant d'ouvrir la console AWS, on prend une feuille et on associe chaque contrainte à un mécanisme qui la <b>garantit</b>, et pas seulement qui la rend probable. Ce tableau a guidé tout le projet ; il deviendra le cœur du dossier de conception.</p>
+
+<table>
+<tr><th style="width:15%">Contrainte</th><th style="width:40%">Mécanisme choisi</th><th>Pourquoi celui-là</th></tr>
+<tr><td><b>C1</b> un exemplaire de trop</td><td>Compteur <code>remaining</code> dans DynamoDB, décrémenté par une <b>écriture conditionnelle</b> : <code>SET remaining = remaining - 1</code> si <code>remaining &gt; 0</code>.</td><td>DynamoDB applique les écritures sur un même élément l'une après l'autre et évalue la condition sur la valeur à jour : avec N exemplaires, exactement N écritures réussissent. Pas de « lire puis écrire », qui laisse une fenêtre de course.</td></tr>
+<tr><td><b>C2</b> aucune perte, convergence</td><td>Un <b>CRDT</b> (bibliothèque Yjs) : chaque modification est stockée dans DynamoDB <b>avant</b> d'être confirmée, puis diffusée par WebSocket.</td><td>Les modifications d'un CRDT se fusionnent dans n'importe quel ordre, même en double, et donnent le même texte. Le serveur n'a qu'à ne rien perdre, ce qui est compatible avec des fonctions Lambda sans mémoire.</td></tr>
+<tr><td><b>C3</b> le document à T1</td><td>Le PDF est produit <b>au moment du téléchargement</b>, mis en cache dans S3 sous le numéro de révision du document.</td><td>Le lien ne contient pas de fichier, seulement un compteur : il sert toujours l'état courant.</td></tr>
+<tr><td><b>C4</b> crédit multi-appareils</td><td>Une <b>transaction DynamoDB</b> : « stocker la modification » + « ajouter n à <code>used</code> si <code>used ≤ 10 000 − n</code> ».</td><td>Un seul compteur par personne et par jour, quel que soit l'appareil ; tout ou rien.</td></tr>
+<tr><td><b>C5</b> le pic</td><td>CloudFront pour les pages, limitation de débit d'API Gateway, <b>concurrence Lambda réservée</b>, DynamoDB à la demande.</td><td>Absorber le pic sans serveur à dimensionner, et cloisonner les visiteurs pour que les rédacteurs continuent d'écrire.</td></tr>
+<tr><td><b>C6</b> fin de distribution</td><td>Réponse <code>410</code> immédiate, statut du lien mis en cache 2 s par CloudFront, flux DynamoDB → fonction → e-mail SNS.</td><td>Plus aucun PDF généré après épuisement ; l'e-mail part hors du chemin du téléchargement.</td></tr>
+</table>
+
+<div class="fig"><svg width="176mm" height="66mm" viewBox="0 0 700 262" xmlns="http://www.w3.org/2000/svg" font-family="DejaVu Sans, Arial" font-size="10.5">
+<defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#5b6475"/></marker></defs>
+<g fill="#fff" stroke="#9aa6b8">
+<rect x="4" y="96" width="92" height="56" rx="6" fill="#f1f3f6"/>
+<rect x="138" y="14" width="140" height="44" rx="6" fill="#eef0ff" stroke="#4f46e5"/>
+<rect x="138" y="96" width="140" height="56" rx="6" fill="#e8eef7" stroke="#1f4e8c"/>
+<rect x="138" y="190" width="140" height="56" rx="6" fill="#e8eef7" stroke="#1f4e8c"/>
+<rect x="318" y="96" width="132" height="56" rx="6" fill="#fff6e5" stroke="#d88a00"/>
+<rect x="318" y="190" width="132" height="56" rx="6" fill="#fff6e5" stroke="#d88a00"/>
+<rect x="490" y="96" width="98" height="56" rx="6" fill="#eaf6ee" stroke="#2e8b57"/>
+<rect x="490" y="14" width="98" height="44" rx="6" fill="#eaf6ee" stroke="#2e8b57"/>
+<rect x="612" y="96" width="84" height="56" rx="6" fill="#fff6e5" stroke="#d88a00"/>
+<rect x="612" y="190" width="84" height="56" rx="6" fill="#fdecea" stroke="#c0392b"/>
+<rect x="318" y="14" width="132" height="44" rx="6" fill="#eaf6ee" stroke="#2e8b57"/>
+</g>
+<g fill="#1d2330" text-anchor="middle">
+<text x="50" y="121" font-weight="bold">Navigateur</text><text x="50" y="136" font-size="9">rédacteur / visiteur</text>
+<text x="208" y="33" font-weight="bold">CloudFront</text><text x="208" y="48" font-size="9">site + /public/* (cache 2 s)</text>
+<text x="208" y="118" font-weight="bold">API Gateway HTTP</text><text x="208" y="133" font-size="9">limite 300 req/s sur</text><text x="208" y="145" font-size="9">le téléchargement</text>
+<text x="208" y="212" font-weight="bold">API Gateway</text><text x="208" y="226" font-weight="bold">WebSocket</text><text x="208" y="239" font-size="9">présence + diffusion</text>
+<text x="384" y="118" font-weight="bold">Lambda</text><text x="384" y="132" font-size="9">api · update · claim (100</text><text x="384" y="144" font-size="9">réservées) · admin</text>
+<text x="384" y="212" font-weight="bold">Lambda</text><text x="384" y="226" font-size="9">connect · disconnect</text><text x="384" y="238" font-size="9">message</text>
+<text x="539" y="120" font-weight="bold">DynamoDB</text><text x="539" y="134" font-size="9">9 tables</text><text x="539" y="146" font-size="9">à la demande</text>
+<text x="539" y="33" font-weight="bold">S3</text><text x="539" y="48" font-size="9">pdf/ · versions/</text>
+<text x="384" y="33" font-weight="bold">S3 site</text><text x="384" y="48" font-size="9">privé (OAC)</text>
+<text x="654" y="118" font-weight="bold">Lambda</text><text x="654" y="132" font-size="9">notify</text><text x="654" y="144" font-size="9">(flux 1 → 0)</text>
+<text x="654" y="216" font-weight="bold">SNS</text><text x="654" y="230" font-size="9">e-mail</text>
+</g>
+<g stroke="#5b6475" stroke-width="1.4" fill="none" marker-end="url(#a)">
+<path d="M96,112 L136,40"/><path d="M96,124 L136,124"/><path d="M96,138 L136,212"/>
+<path d="M278,36 L316,36"/><path d="M278,124 L316,124"/><path d="M278,218 L316,218"/>
+<path d="M450,124 L488,124"/><path d="M450,206 L500,154"/><path d="M450,110 L500,60"/>
+<path d="M588,124 L610,124"/><path d="M654,152 L654,188"/>
+<path d="M320,190 C300,170 300,165 280,150" stroke-dasharray="4 3"/>
+</g>
+</svg>
+<div class="caption"><b>Schéma 1.</b> L'architecture à construire, dans une seule région. Tout est « serverless » : aucune machine à dimensionner pour le pic, rien n'est facturé au repos. La flèche pointillée est la diffusion des modifications vers les navigateurs connectés.</div></div>
+
+<h3>Deux décisions de fond</h3>
+<p><b>Serverless plutôt qu'un serveur EC2.</b> Un serveur Node.js aurait été plus simple à programmer (il garde le document en mémoire). Mais pour un pic d'une minute, il faudrait le dimensionner à l'avance, ajouter un équilibreur de charge et de l'auto-scaling (trop lent pour une minute), et le payer en continu, ce qui va contre le plan gratuit (R-Compte). Lambda, API Gateway et DynamoDB montent en charge immédiatement, ne coûtent rien au repos, et permettent un rôle IAM par fonction (R-Droits).</p>
+<p><b>AWS SAM plutôt que la console.</b> Le sujet demande « la description de l'infrastructure » dans le dépôt et un README qui explique comment « déployer, tester et supprimer l'ensemble ». On décrit donc tout dans un fichier <code>template.yaml</code> (Infrastructure as Code, une bonne pratique : R-Pratiques). SAM est une extension de CloudFormation, plus courte pour décrire des fonctions et leurs déclencheurs, et un seul fichier YAML reste lisible par le jury. On ne clique jamais pour créer une ressource : une commande déploie, une commande supprime.</p>
+
+<!-- ======================================================================= -->
+<h2>2. Ouvrir et préparer le compte AWS</h2>
+<h3>2.1 Créer le compte</h3>
+<ol>
+<li>Sur <code>aws.amazon.com</code>, choisir <b>Créer un compte</b>. Il faut une adresse e-mail, un numéro de téléphone et une carte bancaire (vérification d'identité, aucun prélèvement sur le plan gratuit).</li>
+<li>Au moment du choix de l'offre, prendre le <b>plan gratuit (Free plan)</b>. Ce plan <b>ne peut pas produire de facture</b> : la consommation est prélevée sur des crédits (100 $ à l'ouverture, plus des bonus d'activités). C'est exactement la consigne R-Compte, et une protection contre une erreur coûteuse.</li>
+<li>Se connecter une première fois à la console avec ce compte.</li>
+</ol>
+
+<h3>2.2 Connaître sa région</h3>
+<p>Avec la nouvelle inscription d'AWS, le compte est rattaché à <b>une seule région</b>, déduite du pays de l'adresse. Pour la trouver : <b>AWS Settings</b> (<code>settings.aws.com</code>) › <i>Project</i> › <i>Overview</i> › <i>Additional Info</i>. Pour ce projet, c'était <code>eu-north-1</code>. La console n'a alors pas de sélecteur de région, et toute requête vers une autre région est refusée.</p>
+<div class="box contrainte"><div class="box-title">CONSIGNE · R-COMPTE « TOUTES VOS RESSOURCES SONT DANS UNE SEULE RÉGION »</div>
+<p>Si votre compte est de l'ancien type, avec un sélecteur de région en haut à droite de la console, choisissez une région une fois pour toutes et utilisez-la partout : <code>samconfig.toml</code>, la commande <code>aws configure</code> et la variable <code>AWS_REGION</code>. CloudFront est un service mondial ; il ne crée aucune ressource dans une autre région, car on n'utilise ni certificat ni WAF (qui exigeraient <code>us-east-1</code>).</p></div>
+
+<h3>2.3 Vérifier le quota Lambda <i>avant</i> de construire</h3>
+<p>La contrainte C5 repose sur la <b>concurrence réservée</b> : on réserve 100 exécutions simultanées à la fonction de téléchargement. AWS exige qu'il reste au moins 100 exécutions non réservées sur le compte. Le compte doit donc avoir un quota d'au moins 200. Les comptes récents en ont parfois seulement 10. On vérifie à l'étape 4, une fois la CLI connectée :</p>
+<div class="cmd"><div class="cmd-title">Terminal</div><pre>aws lambda get-account-settings --query AccountLimit.ConcurrentExecutions
+<span class="out">400</span>
+# si la valeur est inférieure à 200 : demander une augmentation (réponse sous quelques heures à quelques jours)
+aws service-quotas request-service-quota-increase --service-code lambda \
+  --quota-code L-B99A9384 --desired-value 1000</pre></div>
+<div class="box attention"><div class="box-title">À FAIRE DÈS LE VENDREDI</div><p>Une augmentation de quota n'est pas immédiate. Si vous en avez besoin, demandez-la tout de suite. Sinon le premier déploiement échouera avec <code>Specified ReservedConcurrentExecutions ... decreases account's UnreservedConcurrentExecution below its minimum value of [100]</code>.</p></div>
+
+<!-- ======================================================================= -->
+<h2>3. Équiper son poste</h2>
+<p>Cinq outils suffisent. Les commandes sont données pour Linux (x86_64) ; les équivalents macOS et Windows sont indiqués.</p>
+<table>
+<tr><th style="width:18%">Outil</th><th style="width:30%">Rôle dans le projet</th><th>Pourquoi</th></tr>
+<tr><td>AWS CLI v2 (≥ 2.32)</td><td>Parler à AWS depuis le terminal</td><td>Version 2.32 minimum pour <code>aws login</code>, qui évite de créer des clés d'accès (R-Clés).</td></tr>
+<tr><td>AWS SAM CLI</td><td>Déployer <code>template.yaml</code></td><td>Transforme le modèle en pile CloudFormation et envoie le code des fonctions.</td></tr>
+<tr><td>Node.js 22 + npm</td><td>Construire backend et frontend, lancer les tests</td><td>Même version que l'environnement d'exécution Lambda (<code>nodejs22.x</code>).</td></tr>
+<tr><td>Git</td><td>Le dépôt à rendre</td><td>Livrable n° 1.</td></tr>
+<tr><td>openssl</td><td>Générer les secrets</td><td>Déjà présent sur Linux et macOS ; fourni avec Git pour Windows.</td></tr>
+</table>
+
+<div class="cmd"><div class="cmd-title">Terminal · AWS CLI v2</div><pre>curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o awscliv2.zip
+unzip awscliv2.zip
+sudo ./aws/install            # mise à jour d'une version existante : sudo ./aws/install --update
+# macOS   : curl "https://awscli.amazonaws.com/AWSCLIV2.pkg" -o AWSCLIV2.pkg &amp;&amp; sudo installer -pkg AWSCLIV2.pkg -target /
+# Windows : msiexec.exe /i https://awscli.amazonaws.com/AWSCLIV2.msi</pre></div>
+
+<div class="cmd"><div class="cmd-title">Terminal · AWS SAM CLI</div><pre>curl -L -o sam.zip https://github.com/aws/aws-sam-cli/releases/latest/download/aws-sam-cli-linux-x86_64.zip
+unzip sam.zip -d sam-installation
+sudo ./sam-installation/install
+# sans droits administrateur : ./sam-installation/install -i ~/.local/aws-sam-cli -b ~/.local/bin
+# macOS : brew install aws-sam-cli   ·   Windows : installeur MSI sur la page des versions de aws-sam-cli</pre></div>
+
+<div class="cmd"><div class="cmd-title">Terminal · Node.js 22 (via nvm), Git</div><pre>curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
+# fermer et rouvrir le terminal, puis :
+nvm install 22
+sudo apt install -y git unzip     # macOS : xcode-select --install · Windows : Git for Windows</pre></div>
+
+<div class="cmd"><div class="cmd-title">Terminal · vérification</div><pre>aws --version &amp;&amp; sam --version &amp;&amp; node --version &amp;&amp; git --version &amp;&amp; openssl version
+<span class="out">aws-cli/2.38.4 ...   SAM CLI, version 1.170.0   v22.x   git version 2.x   OpenSSL 3.x</span></pre></div>
+<p>Pas besoin d'installer Docker : on n'utilise pas <code>sam build</code> (voir § 6.3). Pas besoin non plus d'installer k6, l'outil de test de charge, sur le poste : il sera installé sur la machine de test temporaire (§ 13).</p>
+
+<!-- ======================================================================= -->
+<h2>4. Connecter la CLI à AWS, sans clé d'accès</h2>
+<p>La méthode habituelle (créer un utilisateur IAM et copier une « access key » dans <code>~/.aws/credentials</code>) laisse une clé permanente sur le disque. Une clé de ce genre finit tôt ou tard dans un dépôt. On ne crée donc <b>aucune clé</b> : <code>aws login</code> ouvre le navigateur, réutilise la session de la console et donne à la CLI des identifiants <b>temporaires</b>.</p>
+<div class="cmd"><div class="cmd-title">Terminal</div><pre>aws login --region eu-north-1
+aws configure set region eu-north-1
+aws sts get-caller-identity
+<span class="out">{ "Account": "896986967186",
+  "Arn": "arn:aws:sts::896986967186:assumed-role/AccountFullAccessRole/8498e4d8-…" }</span></pre></div>
+<p>Le mot <code>assumed-role</code> dans l'ARN confirme qu'on travaille avec une session temporaire, et non avec un utilisateur muni de clés. La session dure au plus 12 heures ; quand la CLI répond <i>Your session has expired</i>, on relance <code>aws login</code>.</p>
+<div class="box contrainte"><div class="box-title">CONSIGNE · R-CLÉS « AUCUNE CLÉ D'ACCÈS AWS N'APPARAÎT DANS LE CODE OU DANS LE DÉPÔT »</div><p>Trois mécanismes couvrent toute l'application : <code>aws login</code> sur le poste ; un <b>rôle IAM</b> par fonction Lambda, dont les identifiants sont fournis automatiquement à l'exécution ; un rôle d'instance pour la machine de test. Aucun de ces identifiants ne peut se retrouver dans un fichier.</p></div>
+<div class="box astuce"><div class="box-title">PIÈGE · « SOMETHING WENT WRONG » À LA CONNEXION</div><p>Avec la nouvelle expérience AWS, <code>aws login --region</code> doit recevoir la région du compte. Avec une autre région, par exemple <code>eu-west-3</code>, la page de connexion affiche seulement « Something went wrong ».</p></div>
+<p>Vérifiez maintenant le quota Lambda (§ 2.3) et vos crédits :</p>
+<div class="cmd"><div class="cmd-title">Terminal</div><pre>aws freetier get-account-plan-state --query '{plan:accountPlanType,credits:accountPlanRemainingCredits}'
+<span class="out">{ "plan": "FREE", "credits": { "amount": 119.98, "unit": "USD" } }</span></pre></div>
+<p>Notez ce chiffre et la date : c'est le premier point de la preuve des coûts (livrable n° 5).</p>
+
+<!-- ======================================================================= -->
+<h2>5. Créer le dépôt et son squelette</h2>
+<div class="cmd"><div class="cmd-title">Terminal</div><pre>mkdir CollabDoc &amp;&amp; cd CollabDoc &amp;&amp; git init
+mkdir -p backend/src/handlers backend/src/lib backend/scripts backend/test \
+         scripts tests/load tests/convergence tests/results docs</pre></div>
+<p>L'arborescence finale, qui correspond aux livrables :</p>
+<div class="cmd"><div class="cmd-title">Arborescence</div><pre>template.yaml    infrastructure (SAM)                       → description de l'infrastructure
+samconfig.toml   paramètres de déploiement
+backend/         fonctions Lambda + tests unitaires         → code de l'application
+frontend/        application web (React + Vite)             → code de l'application
+tests/           tests de bout en bout, de charge, résultats → tests, rapport de test
+scripts/         bootstrap · deploy · destroy · loadtest    → déployer, tester, supprimer
+docs/            conception · api · rapport-tests · couts   → livrables 2 à 5
+README.md</pre></div>
+
+<h3>5.1 Le fichier .gitignore</h3>
+<div class="cmd"><div class="cmd-title">.gitignore</div><pre>node_modules/
+dist/
+.aws-sam/
+*.log
+.env
+.env.*
+samconfig.local.toml
+!tests/results/**/*.log
+!tests/results/*.log</pre></div>
+<p><code>dist/</code> et <code>.aws-sam/</code> sont des fichiers générés, qu'il ne faut pas versionner. <code>.env*</code> est exclu par précaution (R-Clés), même si le projet n'en utilise pas. Les deux dernières lignes font une exception pour les journaux de test, qui font partie des <b>résultats bruts</b> exigés dans le rapport de test.</p>
+
+<h3>5.2 Le fichier samconfig.toml</h3>
+<p>Ce fichier évite de retaper les options de déploiement. Il est lu par <code>sam deploy</code> et <code>sam delete</code>.</p>
+<div class="cmd"><div class="cmd-title">samconfig.toml</div><pre>version = 0.1
+
+[default.global.parameters]
+stack_name = "collabdoc"          # nom de la pile CloudFormation
+region = "eu-north-1"             # la seule région (R-Compte)
+
+[default.deploy.parameters]
+capabilities = "CAPABILITY_IAM"   # autorise SAM à créer les rôles IAM des fonctions
+resolve_s3 = true                 # SAM crée lui-même le bucket où il dépose le code
+s3_prefix = "collabdoc"
+confirm_changeset = false         # pas de question interactive (script reproductible)
+fail_on_empty_changeset = false   # redéployer sans changement n'est pas une erreur
+tags = "project=\"collabdoc\""    # étiquette sur toutes les ressources : suivi des coûts</pre></div>
+<p><code>CAPABILITY_IAM</code> est obligatoire : sans lui, CloudFormation refuse de créer des rôles, par sécurité. L'étiquette <code>project=collabdoc</code> permettra de compter les ressources, de filtrer les coûts (livrable n° 5) et de vérifier qu'elles ont toutes disparu à la fin.</p>
+
+<!-- ======================================================================= -->
+<h2 class="break">6. Le backend : ce que le code doit faire</h2>
+<p>Le code des fonctions n'est pas détaillé ici. Ce qui suit est le <b>contrat</b> que votre code doit respecter, pour se brancher sur l'infrastructure du § 8 et pour tenir les contraintes. Le choix de TypeScript sur Node.js 22 vient de ce que le même langage sert au frontend, et que la bibliothèque Yjs (C2) est en JavaScript.</p>
+
+<h3>6.1 Initialiser le projet et installer les dépendances</h3>
+<div class="cmd"><div class="cmd-title">Terminal · dans backend/</div><pre>npm init -y &amp;&amp; npm pkg set type=module
+npm install @aws-sdk/client-dynamodb @aws-sdk/lib-dynamodb @aws-sdk/util-dynamodb \
+            @aws-sdk/client-s3 @aws-sdk/s3-request-presigner @aws-sdk/client-sns \
+            @aws-sdk/client-ssm @aws-sdk/client-apigatewaymanagementapi yjs pdf-lib
+npm install -D typescript esbuild vitest @types/aws-lambda @types/node
+npm pkg set scripts.build="node scripts/build.mjs" scripts.test="vitest run" scripts.typecheck="tsc --noEmit"</pre></div>
+<table>
+<tr><th style="width:34%">Paquet</th><th>Usage</th></tr>
+<tr><td><code>@aws-sdk/*</code> (SDK v3)</td><td>DynamoDB, S3 et URL pré-signées, SNS (e-mail), SSM (secrets), API de gestion des connexions WebSocket. Le SDK lit tout seul les identifiants du rôle de la fonction : aucune clé dans le code.</td></tr>
+<tr><td><code>yjs</code></td><td>Le CRDT (C2) : fusionner les modifications, compter les caractères insérés (C4).</td></tr>
+<tr><td><code>pdf-lib</code></td><td>Générer le PDF en JavaScript pur, sans navigateur embarqué : le paquet de la fonction reste petit et son démarrage rapide (C5).</td></tr>
+<tr><td><code>esbuild</code>, <code>vitest</code></td><td>Empaqueter chaque fonction ; tests unitaires.</td></tr>
+</table>
+
+<h3>6.2 Les neuf fonctions et leur responsabilité</h3>
+<p>Une fonction par fichier <code>backend/src/handlers/&lt;nom&gt;.ts</code>, qui exporte <code>handler</code>. Le code commun (accès DynamoDB, jetons, comptage, PDF) va dans <code>backend/src/lib/</code>.</p>
+<table>
+<tr><th style="width:15%">Fichier</th><th style="width:27%">Déclencheur</th><th>Ce qu'il doit faire, et la garantie à respecter</th></tr>
+<tr><td><code>api</code></td><td>HTTP : <code>/session</code>, <code>/me</code>, <code>/documents…</code> (membres, état, versions, liens)</td><td>Session : nom + e-mail → jeton signé HMAC avec le secret lu dans SSM. Créer et partager un document. <code>GET /state</code> : fusionner toutes les modifications stockées, en <b>lecture fortement cohérente</b> ; avec <code>?sv=</code>, ne renvoyer que ce qui manque au client. Versions : instantané texte dans S3 <code>versions/</code> ; une restauration est une nouvelle modification CRDT. Créer un lien : <code>remaining = maxDownloads</code>, puis abonner le créateur au sujet SNS avec une politique de filtre sur son adresse.</td></tr>
+<tr><td><code>update</code></td><td>HTTP : <code>POST /documents/{id}/updates</code></td><td><b>C2 et C4.</b> Compter côté serveur les caractères insérés, puis exécuter une <b>transaction</b> : <code>Put</code> dans Updates avec <code>attribute_not_exists(updateId)</code> (un renvoi n'est jamais stocké deux fois) et <code>Update</code> du crédit avec la condition <code>used ≤ 10 000 − n</code>. Ensuite seulement : <code>ADD rev 1</code> sur le document (C3), réponse 200, diffusion aux connexions WebSocket du document. En cas de refus : 403 (crédit épuisé), avertissement d'abus ; au-delà de 20 avertissements en 10 minutes, blocage de 15 minutes (423).</td></tr>
+<tr><td><code>claim</code></td><td>HTTP public : <code>POST /links/{id}/claim</code>, <code>GET /links/{id}</code>, <code>GET /public/links/{id}</code></td><td><b>C1, C3, C6.</b> Écriture conditionnelle <code>remaining − 1 si remaining &gt; 0</code>. Échec → <code>410</code> épuisé. Succès → trace dans Claims, lecture cohérente de <code>rev</code>, PDF <code>pdf/&lt;doc&gt;/&lt;rev&gt;.pdf</code> lu dans S3 ou généré, puis URL pré-signée valable 60 s. Si le PDF échoue, rendre l'exemplaire (<code>+1</code>). Le statut public répond avec <code>Cache-Control: max-age=2</code>.</td></tr>
+<tr><td><code>admin</code></td><td>HTTP : <code>GET /admin/state</code></td><td>Vérifier l'en-tête <code>x-admin-token</code> (secret SSM). Lecture seule : documents ouverts (connexions actives), liens et exemplaires restants, personnes bloquées.</td></tr>
+<tr><td><code>wsConnect</code> / <code>wsDisconnect</code></td><td>WebSocket <code>$connect</code> / <code>$disconnect</code></td><td>Vérifier le jeton et l'accès au document, refuser une personne bloquée ; enregistrer ou retirer la connexion dans Connections ; annoncer la présence.</td></tr>
+<tr><td><code>wsMessage</code></td><td>WebSocket <code>$default</code></td><td>Relayer la présence (qui est là, où est son curseur) aux autres participants.</td></tr>
+<tr><td><code>notify</code></td><td>Flux DynamoDB de Links</td><td>Publier un message SNS avec l'attribut <code>creator</code> ; le filtre SNS l'achemine au seul créateur du lien.</td></tr>
+<tr><td><code>snapshot</code></td><td>Planificateur, toutes les 10 minutes</td><td>Enregistrer une version automatique de chaque document modifié depuis la dernière.</td></tr>
+</table>
+<p>Les noms des tables, du bucket et des secrets ne sont jamais écrits en dur : le code les lit dans des <b>variables d'environnement</b> fournies par le modèle (§ 8.1) : <code>TABLE_DOCUMENTS</code>, <code>TABLE_MEMBERS</code>, <code>TABLE_UPDATES</code>, <code>TABLE_CREDITS</code>, <code>TABLE_CONNECTIONS</code>, <code>TABLE_LINKS</code>, <code>TABLE_CLAIMS</code>, <code>TABLE_VERSIONS</code>, <code>TABLE_ABUSE</code>, <code>DATA_BUCKET</code>, <code>WS_ENDPOINT</code>, <code>SESSION_SECRET_PARAM</code>, <code>ADMIN_TOKEN_PARAM</code>, <code>NOTIFICATION_TOPIC_ARN</code>, et <code>FRONTEND_URL</code> pour la seule fonction notify.</p>
+
+<div class="box remarque"><div class="box-title">POURQUOI LE COMPTEUR DE LIEN N'EST PAS DANS UNE TRANSACTION, ALORS QUE LE CRÉDIT L'EST</div><p>Des transactions concurrentes sur le <b>même élément</b> se rejettent mutuellement (<code>TransactionConflict</code>). Pendant le pic, des milliers de visiteurs visent le même lien : une transaction produirait une foule d'échecs inutiles. L'écriture conditionnelle simple, elle, est appliquée à la suite sans conflit. Le crédit, au contraire, ne concerne qu'une personne, avec peu d'appareils : la transaction y est sans risque, et elle seule garantit le « tout ou rien » entre stocker et débiter.</p></div>
+
+<h3>6.3 Empaqueter les fonctions : backend/scripts/build.mjs</h3>
+<p>Ce script de 20 lignes passe chaque fichier de <code>src/handlers/</code> dans esbuild, avec les options <code>bundle: true</code>, <code>platform: 'node'</code>, <code>target: 'node22'</code>, <code>format: 'cjs'</code> et <code>minify: true</code>. Il produit <code>dist/&lt;nom&gt;/index.js</code>, un seul fichier par fonction qui contient tout son code et ses dépendances.</p>
+<p><b>Pourquoi :</b> SAM envoie le dossier <code>dist/&lt;nom&gt;</code> tel quel (<code>CodeUri</code> au § 8.8). On n'a donc besoin ni de <code>sam build</code> ni de Docker. Chaque fonction ne contient que ce qu'elle importe : le paquet est petit et le démarrage à froid court, ce qui compte pendant le pic. Le fichier <code>tsconfig.json</code> ne sert qu'à la vérification des types (<code>noEmit</code>, <code>strict</code>, <code>moduleResolution: bundler</code>).</p>
+
+<h3>6.4 Les tests unitaires</h3>
+<p>Dans <code>backend/test/*.test.ts</code> (Vitest) : comptage des caractères insérés, propriétés du CRDT (ordre indifférent, doublons sans effet), rattrapage par vecteur d'état, jetons signés, génération du PDF. Ils sont lancés automatiquement avant chaque déploiement (§ 10). Un test qui échoue arrête tout.</p>
+
+<!-- ======================================================================= -->
+<h2>7. Le frontend : coder votre interface</h2>
+<p>L'interface est entièrement libre ; son apparence vous revient. On a utilisé React + Vite, avec CodeMirror 6 pour l'éditeur et l'extension <code>y-codemirror.next</code>, qui relie l'éditeur au CRDT et affiche les curseurs des autres.</p>
+<div class="cmd"><div class="cmd-title">Terminal · à la racine</div><pre>npm create vite@latest frontend -- --template react-ts
+cd frontend &amp;&amp; npm install codemirror @codemirror/state @codemirror/view yjs y-codemirror.next y-protocols</pre></div>
+<p>Pour que les contraintes tiennent, l'interface doit en revanche respecter ces règles :</p>
+<table>
+<tr><th style="width:30%">Comportement attendu</th><th>Raison</th></tr>
+<tr><td>Lire les URL de l'API dans <code>window.COLLABDOC_CONFIG</code>, chargé par <code>&lt;script src="/config.js"&gt;</code> dans <code>index.html</code>.</td><td>Les URL ne sont connues qu'après le déploiement : <code>deploy.sh</code> écrit ce fichier (§ 10). Le même code fonctionne pour tout compte, sans recompiler.</td></tr>
+<tr><td>Regrouper les frappes (~80 ms), envoyer <b>une</b> modification à la fois, avec un identifiant unique, et la renvoyer avec le <b>même</b> identifiant en cas d'échec réseau.</td><td>C2 : rien ne se perd, et le serveur détecte les doublons.</td></tr>
+<tr><td>Recharger l'état à chaque connexion et, toutes les 15 s, envoyer son vecteur d'état (<code>GET /state?sv=</code>).</td><td>C2 : toute diffusion WebSocket perdue est rattrapée ; tous convergent.</td></tr>
+<tr><td>Page publique de téléchargement <code>#/d/&lt;linkId&gt;</code> : sur <code>429</code>/<code>503</code>, afficher « patientez » et réessayer avec un délai croissant aléatoire ; interroger le statut <code>/public/links/&lt;id&gt;</code> toutes les ~5 s.</td><td>C5 : chaque visiteur sait où il en est. C6 : il apprend l'épuisement sans même cliquer.</td></tr>
+<tr><td>Page <code>#/admin</code> qui demande le jeton et affiche <code>GET /admin/state</code> toutes les 5 s.</td><td>« L'association doit pouvoir consulter à tout moment l'état de l'application. »</td></tr>
+</table>
+<p>Pour développer en local contre l'application déployée : créer <code>frontend/public/config.js</code> avec les URL de l'API, puis <code>npm run dev</code>.</p>
+
+<!-- ======================================================================= -->
+<h2 class="break">8. Décrire l'infrastructure : le fichier template.yaml</h2>
+<p>Voici le cœur du projet côté AWS. Le fichier fait environ 640 lignes ; on le décrit bloc par bloc, dans l'ordre où il est écrit, en donnant les réglages importants et la consigne qu'ils servent. CloudFormation crée les ressources dans l'ordre que leurs dépendances imposent, pas dans l'ordre du fichier.</p>
+
+<h3>8.1 En-tête, paramètres et réglages communs</h3>
+<div class="cmd"><div class="cmd-title">template.yaml · début</div><pre>AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31      # active la syntaxe SAM
+
+Parameters:
+  SessionSecretParam: { Type: String, Default: /collabdoc/session-secret }
+  AdminTokenParam:    { Type: String, Default: /collabdoc/admin-token }
+  ClaimRateLimit:     { Type: Number, Default: 300 }   # téléchargements acceptés par seconde
+  ClaimBurstLimit:    { Type: Number, Default: 300 }
+  ClaimReservedConcurrency: { Type: Number, Default: 100 }
+
+Globals:
+  Function:
+    Runtime: nodejs22.x
+    Architectures: [arm64]       # processeurs Graviton : environ 20 % moins chers à performance égale
+    MemorySize: 512
+    Timeout: 10
+    Handler: index.handler       # le fichier index.js produit par build.mjs
+    LoggingConfig: { LogGroup: !Ref LambdaLogGroup, LogFormat: Text }
+    Tags: { project: collabdoc }
+    Environment:
+      Variables:
+        TABLE_DOCUMENTS: !Ref DocumentsTable     # … une variable par table (liste au § 6.2)
+        DATA_BUCKET: !Ref DataBucket
+        WS_ENDPOINT: !Sub https://${WebSocketApi}.execute-api.${AWS::Region}.amazonaws.com/prod
+        SESSION_SECRET_PARAM: !Ref SessionSecretParam
+        ADMIN_TOKEN_PARAM: !Ref AdminTokenParam
+        NOTIFICATION_TOPIC_ARN: !Ref LinkNotificationTopic</pre></div>
+<p>Les réglages du pic sont des <b>paramètres</b> : on peut les ajuster au déploiement sans modifier le modèle. Le bloc <code>Globals</code> évite de répéter neuf fois les mêmes réglages. Les variables d'environnement contiennent des <b>noms</b> de ressources et de paramètres, jamais des secrets.</p>
+
+<h3>8.2 Les journaux</h3>
+<div class="cmd"><div class="cmd-title">template.yaml</div><pre>LambdaLogGroup:
+  Type: AWS::Logs::LogGroup
+  Properties:
+    LogGroupName: !Sub /collabdoc/${AWS::StackName}/lambda
+    RetentionInDays: 14</pre></div>
+<p>Un seul groupe pour les neuf fonctions, ce qui simplifie l'enquête après un test. La rétention de 14 jours évite que les journaux s'accumulent et coûtent (R-Pratiques). Sans ce bloc, Lambda crée des groupes conservés indéfiniment.</p>
+
+<h3>8.3 Le bucket des fichiers téléchargés</h3>
+<div class="cmd"><div class="cmd-title">template.yaml</div><pre>DataBucket:
+  Type: AWS::S3::Bucket
+  Properties:
+    PublicAccessBlockConfiguration:      # aucun accès public possible
+      { BlockPublicAcls: true, BlockPublicPolicy: true, IgnorePublicAcls: true, RestrictPublicBuckets: true }
+    BucketEncryption:
+      ServerSideEncryptionConfiguration: [{ ServerSideEncryptionByDefault: { SSEAlgorithm: AES256 } }]
+    LifecycleConfiguration:
+      Rules: [{ Id: expire-old-pdf-renders, Status: Enabled, Prefix: pdf/, ExpirationInDays: 2 }]
+
+DataBucketPolicy:                        # refuse toute requête non chiffrée (HTTP)
+  Type: AWS::S3::BucketPolicy
+  Properties:
+    Bucket: !Ref DataBucket
+    PolicyDocument:
+      Statement:
+        - { Sid: DenyInsecureTransport, Effect: Deny, Principal: '*', Action: 's3:*',
+            Resource: [!GetAtt DataBucket.Arn, !Sub '${DataBucket.Arn}/*'],
+            Condition: { Bool: { 'aws:SecureTransport': false } } }</pre></div>
+<div class="box contrainte"><div class="box-title">CONSIGNE · R-S3 « LES FICHIERS À TÉLÉCHARGER SONT CONSERVÉS DANS S3 »</div><p>Les PDF sont rangés sous <code>pdf/&lt;docId&gt;/&lt;rev&gt;.pdf</code> et les versions sous <code>versions/</code>. Le bucket est privé : le visiteur reçoit une <b>URL pré-signée valable 60 s</b>, et le fichier transite directement de S3 vers son navigateur, sans passer par Lambda. Les PDF de plus de 2 jours sont supprimés seuls : ils peuvent toujours être régénérés à partir de l'état du document.</p></div>
+
+<h3>8.4 Les neuf tables DynamoDB</h3>
+<p>Toutes en <code>BillingMode: PAY_PER_REQUEST</code> (à la demande) : on ne prévoit aucune capacité, la table absorbe le pic (C5) et ne coûte rien au repos (R-Compte). Exemple complet, la table des liens :</p>
+<div class="cmd"><div class="cmd-title">template.yaml · LinksTable</div><pre>LinksTable:
+  Type: AWS::DynamoDB::Table
+  Properties:
+    BillingMode: PAY_PER_REQUEST
+    AttributeDefinitions:
+      - { AttributeName: linkId, AttributeType: S }
+      - { AttributeName: docId,  AttributeType: S }
+    KeySchema: [{ AttributeName: linkId, KeyType: HASH }]
+    GlobalSecondaryIndexes:              # « les liens de ce document »
+      - IndexName: byDoc
+        KeySchema: [{ AttributeName: docId, KeyType: HASH }]
+        Projection: { ProjectionType: ALL }
+    StreamSpecification: { StreamViewType: NEW_AND_OLD_IMAGES }   # pour l'e-mail (C6)
+    Tags: [{ Key: project, Value: collabdoc }]</pre></div>
+<table>
+<tr><th style="width:15%">Table</th><th style="width:27%">Clé (+ index)</th><th style="width:15%">Option</th><th>Rôle</th></tr>
+<tr><td>Documents</td><td><code>docId</code></td><td></td><td>Titre, propriétaire, révision <code>rev</code> (C3).</td></tr>
+<tr><td>Members</td><td><code>email</code> + <code>docId</code> · index <code>byDoc</code></td><td></td><td>Qui a accès à quel document, dans les deux sens.</td></tr>
+<tr><td>Updates</td><td><code>docId</code> + <code>updateId</code></td><td></td><td>Les modifications Yjs acceptées : <b>la source de vérité du contenu</b> (C2).</td></tr>
+<tr><td>Credits</td><td><code>pk</code> = <code>email#jour</code></td><td>TTL</td><td>Caractères utilisés ; un nouvel élément chaque jour, l'ancien expire (C4).</td></tr>
+<tr><td>Connections</td><td><code>connectionId</code> · index <code>byDoc</code> (clés seules)</td><td>TTL</td><td>Connexions WebSocket ouvertes ; l'index sert à la diffusion.</td></tr>
+<tr><td>Links</td><td><code>linkId</code> · index <code>byDoc</code></td><td>Flux</td><td><code>maxDownloads</code>, <code>remaining</code> (C1).</td></tr>
+<tr><td>Claims</td><td><code>linkId</code> + <code>claimId</code></td><td></td><td>Un élément par exemplaire distribué : la trace qui sert de preuve pour C1.</td></tr>
+<tr><td>Versions</td><td><code>docId</code> + <code>versionId</code></td><td></td><td>Métadonnées des versions (le texte est dans S3).</td></tr>
+<tr><td>Abuse</td><td><code>pk</code></td><td>TTL</td><td>Avertissements par fenêtre et blocages, qui expirent seuls.</td></tr>
+</table>
+<p>Le <b>TTL</b> (<code>TimeToLiveSpecification: { AttributeName: ttl, Enabled: true }</code>) supprime gratuitement les éléments dont la date <code>ttl</code> est passée. C'est ce qui « recharge » le crédit chaque jour et lève les blocages, sans tâche planifiée.</p>
+
+<h3>8.5 Le sujet SNS pour l'e-mail du dernier téléchargement</h3>
+<div class="cmd"><div class="cmd-title">template.yaml</div><pre>LinkNotificationTopic:
+  Type: AWS::SNS::Topic
+  Properties: { DisplayName: CollabDoc, Tags: [{ Key: project, Value: collabdoc }] }</pre></div>
+<p>Un seul sujet pour toute l'application. À la création d'un lien, la fonction api y abonne l'adresse du créateur avec une <b>politique de filtre</b> <code>{"creator": ["&lt;son e-mail&gt;"]}</code> : chacun ne reçoit que les messages de ses propres liens. Le choix de SNS plutôt que SES est expliqué au § 11.</p>
+
+<h3>8.6 L'API HTTP</h3>
+<div class="cmd"><div class="cmd-title">template.yaml</div><pre>HttpApi:
+  Type: AWS::Serverless::HttpApi
+  Properties:
+    CorsConfiguration:
+      AllowOrigins: ['*']
+      AllowHeaders: [content-type, authorization, x-admin-token]
+      AllowMethods: [GET, POST, OPTIONS]
+      MaxAge: 600
+    DefaultRouteSettings: { ThrottlingBurstLimit: 1000, ThrottlingRateLimit: 1000 }
+    RouteSettings:
+      'POST /links/{linkId}/claim':
+        ThrottlingBurstLimit: !Ref ClaimBurstLimit     # 300
+        ThrottlingRateLimit:  !Ref ClaimRateLimit      # 300 / s</pre></div>
+<p>On prend une <b>API HTTP</b> plutôt qu'une API REST : elle est environ trois fois moins chère, plus rapide, et suffit ici. Les routes ne sont pas déclarées dans ce bloc, mais dans chaque fonction (§ 8.8).</p>
+<p>La <b>limite de débit</b> de la route de téléchargement est le premier rempart du pic (C5). 12 000 visiteurs en une minute font environ 200 requêtes par seconde en moyenne, beaucoup plus à la seconde de l'annonce. Au-delà de 300 par seconde, API Gateway répond lui-même <code>429</code> en quelques millisecondes, sans réveiller de fonction. La page affiche alors « patientez » et réessaie. Le visiteur reçoit une réponse au lieu d'une erreur, comme l'exige le sujet.</p>
+
+<h3>8.7 L'API WebSocket</h3>
+<p>Elle garde une connexion ouverte avec chaque rédacteur, pour lui pousser les modifications des autres et la présence (« qui est là, où il écrit »). SAM n'a pas de raccourci pour les WebSocket : on écrit les ressources CloudFormation de base. Il y a une API, un étage, et, pour chacune des trois routes, une intégration, une route et une permission.</p>
+<div class="cmd"><div class="cmd-title">template.yaml · extrait (route $connect, les deux autres sont identiques)</div><pre>WebSocketApi:
+  Type: AWS::ApiGatewayV2::Api
+  Properties: { Name: !Sub '${AWS::StackName}-ws', ProtocolType: WEBSOCKET,
+                RouteSelectionExpression: $request.body.action }
+WebSocketStage:
+  Type: AWS::ApiGatewayV2::Stage
+  Properties:
+    ApiId: !Ref WebSocketApi
+    StageName: prod
+    AutoDeploy: true
+    DefaultRouteSettings: { ThrottlingBurstLimit: 5000, ThrottlingRateLimit: 5000 }
+  DependsOn: [ConnectRoute, DisconnectRoute, DefaultRoute]
+
+ConnectIntegration:                      # « cette route appelle cette fonction »
+  Type: AWS::ApiGatewayV2::Integration
+  Properties:
+    ApiId: !Ref WebSocketApi
+    IntegrationType: AWS_PROXY
+    IntegrationUri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${WsConnectFunction.Arn}/invocations
+ConnectRoute:
+  Type: AWS::ApiGatewayV2::Route
+  Properties: { ApiId: !Ref WebSocketApi, RouteKey: $connect, Target: !Sub 'integrations/${ConnectIntegration}' }
+ConnectPermission:                       # autorise CETTE API, et elle seule, à appeler la fonction
+  Type: AWS::Lambda::Permission
+  Properties:
+    Action: lambda:InvokeFunction
+    FunctionName: !Ref WsConnectFunction
+    Principal: apigateway.amazonaws.com
+    SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApi}/*</pre></div>
+<p>Les trois routes sont <code>$connect</code> (wsConnect), <code>$disconnect</code> (wsDisconnect) et <code>$default</code> (wsMessage). Le <code>DependsOn</code> garantit que l'étage est créé une fois les routes en place. La limite de 5 000 messages par seconde a été <b>relevée après les tests</b> (§ 13.5).</p>
+<div class="box remarque"><div class="box-title">POURQUOI LES MODIFICATIONS PASSENT PAR HTTP ET NON PAR LE WEBSOCKET</div><p>Une trame WebSocket d'API Gateway est limitée à 32 Kio, ce qu'un grand copier-coller dépasse, et il faudrait construire soi-même l'accusé de réception. En HTTP, la réponse 200 <b>est</b> l'accusé de réception : « acceptée » signifie « écrite dans DynamoDB » (C2). Le jury peut en plus tester l'API avec de simples requêtes HTTP. Le WebSocket ne sert qu'à <b>pousser</b> vers les navigateurs.</p></div>
+
+<h3>8.8 Les fonctions Lambda, chacune avec son propre rôle</h3>
+<p>Chaque fonction est une ressource <code>AWS::Serverless::Function</code>. Le champ <code>CodeUri</code> pointe vers le dossier produit par <code>build.mjs</code>, <code>Events</code> déclare ses déclencheurs, et <code>Policies</code> ses droits. SAM crée <b>un rôle IAM par fonction</b> à partir de <code>Policies</code>. Exemple, la fonction de téléchargement :</p>
+<div class="cmd"><div class="cmd-title">template.yaml · ClaimFunction</div><pre>ClaimFunction:
+  Type: AWS::Serverless::Function
+  Properties:
+    CodeUri: backend/dist/claim
+    Timeout: 15
+    MemorySize: 1024                                  # plus de mémoire = plus de CPU pour générer le PDF
+    ReservedConcurrentExecutions: !Ref ClaimReservedConcurrency   # 100
+    Policies:
+      - Statement:
+          - { Effect: Allow, Action: [dynamodb:GetItem, dynamodb:UpdateItem], Resource: !GetAtt LinksTable.Arn }
+          - { Effect: Allow, Action: [dynamodb:PutItem], Resource: !GetAtt ClaimsTable.Arn }
+          - { Effect: Allow, Action: [dynamodb:GetItem], Resource: !GetAtt DocumentsTable.Arn }
+          - { Effect: Allow, Action: [dynamodb:Query],   Resource: !GetAtt UpdatesTable.Arn }
+          - { Effect: Allow, Action: [s3:GetObject, s3:PutObject], Resource: !Sub '${DataBucket.Arn}/pdf/*' }
+    Events:
+      Claim:        { Type: HttpApi, Properties: { ApiId: !Ref HttpApi, Method: POST, Path: '/links/{linkId}/claim' } }
+      Status:       { Type: HttpApi, Properties: { ApiId: !Ref HttpApi, Method: GET,  Path: '/links/{linkId}' } }
+      PublicStatus: { Type: HttpApi, Properties: { ApiId: !Ref HttpApi, Method: GET,  Path: '/public/links/{linkId}' } }</pre></div>
+<div class="box contrainte"><div class="box-title">CONSIGNE · C5 « PENDANT QUE 300 RÉDACTEURS CONTINUENT D'ÉCRIRE »</div><p>Le compte dispose de 400 exécutions Lambda simultanées, à partager entre toutes les fonctions. <code>ReservedConcurrentExecutions: 100</code> garantit 100 places à la fonction de téléchargement, mais surtout l'<b>empêche d'en prendre plus</b>. Même si 15 000 visiteurs arrivent ensemble, il reste 300 places pour la fonction d'édition : les rédacteurs ne sentent pas le pic. Les visiteurs en trop reçoivent « patientez » (429 ou 503).</p></div>
+<p>Les droits de chaque fonction, tels qu'écrits dans le modèle :</p>
+<table>
+<tr><th style="width:13%">Fonction</th><th style="width:32%">Déclencheurs</th><th>Droits accordés (et rien d'autre)</th></tr>
+<tr><td>api<br><small>Timeout 20</small></td><td>13 routes HTTP : <code>POST /session</code>, <code>GET /me</code>, <code>GET|POST /documents</code>, <code>GET /documents/{docId}</code>, <code>…/members</code>, <code>…/state</code>, <code>…/versions</code> (liste, création, lecture, <code>…/restore</code>), <code>…/links</code> (liste, création)</td><td>Lire le secret de session ; CRUD sur Documents, Members, Updates, Versions, Links ; lecture seule sur Credits, Abuse ; <code>Query</code> sur l'index <code>Connections/byDoc</code> et <code>DeleteItem</code> sur Connections ; S3 <code>versions/*</code> ; <code>sns:Subscribe</code> et <code>sns:ListSubscriptionsByTopic</code> sur le sujet ; envoyer aux connexions WebSocket.</td></tr>
+<tr><td>update</td><td><code>POST /documents/{docId}/updates</code></td><td>Lire le secret de session ; <code>PutItem</code> sur Updates ; <code>UpdateItem</code> sur Documents, Credits, Abuse ; <code>GetItem</code> sur Members, Credits, Abuse ; <code>PutItem</code> sur Abuse ; l'index Connections, <code>DeleteItem</code> sur Connections ; envoyer aux connexions WebSocket.</td></tr>
+<tr><td>claim</td><td>3 routes publiques (ci-dessus)</td><td>Links (lire, décrémenter), Claims (écrire), Documents (lire), Updates (lire), S3 <code>pdf/*</code>. Rien sur le crédit, SSM ou SNS.</td></tr>
+<tr><td>admin</td><td><code>GET /admin/state</code></td><td>Lire le jeton admin ; <code>Scan</code> sur Connections, Links, Abuse ; <code>BatchGetItem</code> sur Documents. Lecture seule.</td></tr>
+<tr><td>wsConnect</td><td><code>$connect</code></td><td>Lire le secret de session ; <code>GetItem</code> sur Members, Abuse ; écrire et supprimer dans Connections, l'index ; envoyer aux connexions WebSocket.</td></tr>
+<tr><td>wsDisconnect</td><td><code>$disconnect</code></td><td><code>DeleteItem</code> sur Connections, l'index ; envoyer aux connexions WebSocket.</td></tr>
+<tr><td>wsMessage</td><td><code>$default</code></td><td><code>GetItem</code> et <code>DeleteItem</code> sur Connections, l'index ; envoyer aux connexions WebSocket.</td></tr>
+<tr><td>notify</td><td>Flux de Links (§ 8.9)</td><td><code>sns:Publish</code> sur le seul sujet du projet.</td></tr>
+<tr><td>snapshot<br><small>Timeout 120</small></td><td>Toutes les 10 minutes (§ 8.9)</td><td>Documents (<code>Scan</code>, lire, mettre à jour), Updates (lire), Versions (écrire), S3 <code>versions/*</code> (écrire).</td></tr>
+</table>
+<p>« Envoyer aux connexions WebSocket » s'écrit <code>execute-api:ManageConnections</code> sur la seule ressource <code>…/${WebSocketApi}/prod/POST/@connections/*</code>. Le droit de lire un secret est limité au seul paramètre concerné : <code>arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${SessionSecretParam}</code>.</p>
+<div class="box contrainte"><div class="box-title">CONSIGNE · R-DROITS « CHAQUE COMPOSANT N'A QUE LES DROITS DONT IL A BESOIN »</div><p>On écrit les droits action par action et ressource par ressource, sans <code>*</code> et sans politique d'administration. Les modèles SAM <code>DynamoDBCrudPolicy</code> et <code>DynamoDBReadPolicy</code>, utilisés pour la fonction api, sont limités chacun à une table. La fonction de téléchargement, exposée à des inconnus, ne peut toucher ni aux crédits, ni aux secrets, ni à l'envoi d'e-mails. Le § 12.3 montre comment le <b>prouver</b>.</p></div>
+
+<h3>8.9 Deux déclencheurs particuliers : le flux DynamoDB et le planificateur</h3>
+<div class="cmd"><div class="cmd-title">template.yaml · NotifyFunction et SnapshotFunction (extraits)</div><pre>NotifyFunction:
+  Properties:
+    CodeUri: backend/dist/notify
+    Environment: { Variables: { FRONTEND_URL: !Sub 'https://${Distribution.DomainName}' } }
+    Policies: [{ Statement: [{ Effect: Allow, Action: sns:Publish, Resource: !Ref LinkNotificationTopic }] }]
+    Events:
+      LastCopy:
+        Type: DynamoDB
+        Properties:
+          Stream: !GetAtt LinksTable.StreamArn
+          StartingPosition: LATEST
+          BatchSize: 10
+          MaximumRetryAttempts: 5
+          FilterCriteria:
+            Filters:
+              - Pattern: '{"eventName":["MODIFY"],"dynamodb":{"NewImage":{"remaining":{"N":["0"]}},"OldImage":{"remaining":{"N":["1"]}}}}'
+
+SnapshotFunction:
+  Properties:
+    CodeUri: backend/dist/snapshot
+    Timeout: 120
+    Events:
+      Every10Min: { Type: ScheduleV2, Properties: { ScheduleExpression: rate(10 minutes) } }</pre></div>
+<p>Le <b>filtre</b> ne laisse passer qu'un seul événement par lien : le passage de <code>remaining</code> de 1 à 0. Pendant le pic, les 499 autres décréments n'invoquent même pas la fonction. L'e-mail est hors du chemin du téléchargement : s'il échoue, aucun visiteur n'est bloqué, et Lambda réessaie jusqu'à 5 fois (C6, « son créateur en est prévenu par e-mail »). <code>ScheduleV2</code> crée une planification EventBridge Scheduler, qui produit les versions automatiques (« consulter les versions précédentes »).</p>
+<div class="box astuce"><div class="box-title">PIÈGE · « CIRCULAR DEPENDENCY BETWEEN RESOURCES »</div><p>Une première version donnait l'URL CloudFront à <i>toutes</i> les fonctions, via <code>Globals</code>. Or CloudFront dépend de l'API, qui dépend des fonctions : CloudFormation refuse le cycle. La correction : ne donner <code>FRONTEND_URL</code> qu'à notify, qui ne dépend pas de l'API.</p></div>
+
+<h3>8.10 Le site : bucket privé, Origin Access Control et CloudFront</h3>
+<div class="cmd"><div class="cmd-title">template.yaml · extraits</div><pre>FrontendBucket:                 # même blocage de l'accès public que DataBucket
+FrontendOAC:
+  Type: AWS::CloudFront::OriginAccessControl
+  Properties:
+    OriginAccessControlConfig: { Name: !Sub '${AWS::StackName}-oac', OriginAccessControlOriginType: s3,
+                                 SigningBehavior: always, SigningProtocol: sigv4 }
+FrontendBucketPolicy:           # seule CETTE distribution peut lire le bucket
+  Statement:
+    - Effect: Allow
+      Principal: { Service: cloudfront.amazonaws.com }
+      Action: s3:GetObject
+      Resource: !Sub '${FrontendBucket.Arn}/*'
+      Condition: { StringEquals: { 'AWS:SourceArn': !Sub 'arn:aws:cloudfront::${AWS::AccountId}:distribution/${Distribution}' } }
+
+Distribution:
+  Type: AWS::CloudFront::Distribution
+  Properties:
+    DistributionConfig:
+      Enabled: true
+      DefaultRootObject: index.html
+      PriceClass: PriceClass_100          # points de présence Europe + Amérique du Nord : le moins cher
+      HttpVersion: http2and3
+      Origins:
+        - { Id: frontend, DomainName: !GetAtt FrontendBucket.RegionalDomainName,
+            OriginAccessControlId: !GetAtt FrontendOAC.Id, S3OriginConfig: { OriginAccessIdentity: '' } }
+        - { Id: api, DomainName: !Sub '${HttpApi}.execute-api.${AWS::Region}.amazonaws.com',
+            CustomOriginConfig: { OriginProtocolPolicy: https-only, OriginSSLProtocols: [TLSv1.2] } }
+      DefaultCacheBehavior:               # le site
+        { TargetOriginId: frontend, ViewerProtocolPolicy: redirect-to-https, Compress: true,
+          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6 }   # politique gérée « CachingOptimized »
+      CacheBehaviors:
+        - PathPattern: /public/*          # le statut des liens, depuis l'API
+          TargetOriginId: api
+          ViewerProtocolPolicy: https-only
+          AllowedMethods: [GET, HEAD]
+          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6     # respecte le max-age=2 de la réponse
+          Compress: true</pre></div>
+<p><b>Pourquoi CloudFront :</b> 15 000 personnes ouvrent la page en une minute. Servies par CloudFront, ces pages ne touchent jamais l'API (C5), et le volume tient dans le niveau gratuit. Le bucket reste privé, sans « hébergement de site statique » public : seul CloudFront le lit, grâce à l'<b>Origin Access Control</b> (R-Pratiques). Le second comportement, <code>/public/*</code>, est le levier de C6. Les pages ouvertes interrogent le statut du lien toutes les ~5 s ; grâce au cache de 2 s, 15 000 pages ne coûtent à l'API que quelques requêtes par seconde, et l'épuisement s'affiche partout en quelques secondes.</p>
+
+<h3>8.11 Les sorties</h3>
+<div class="cmd"><div class="cmd-title">template.yaml · fin</div><pre>Outputs:
+  ApiUrl:             { Value: !Sub 'https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com' }
+  WebSocketUrl:       { Value: !Sub 'wss://${WebSocketApi}.execute-api.${AWS::Region}.amazonaws.com/prod' }
+  FrontendUrl:        { Value: !Sub 'https://${Distribution.DomainName}' }
+  FrontendBucketName: { Value: !Ref FrontendBucket }
+  DistributionId:     { Value: !Ref Distribution }
+  DataBucketName:     { Value: !Ref DataBucket }
+  LogGroup:           { Value: !Ref LambdaLogGroup }</pre></div>
+<p>Les noms réels des ressources sont générés par AWS. Les sorties sont le seul endroit où les scripts vont les chercher. Ainsi, rien n'est écrit en dur, et le projet se déploie à l'identique sur n'importe quel compte.</p>
+
+<h3>8.12 Valider le modèle avant de déployer</h3>
+<div class="cmd"><div class="cmd-title">Terminal</div><pre>sam validate --lint --region eu-north-1
+<span class="out">template.yaml is a valid SAM Template</span></pre></div>
+<p><code>--lint</code> lance cfn-lint, qui détecte les propriétés mal orthographiées, les références vers des ressources inexistantes et les valeurs interdites, avant qu'un déploiement n'échoue au bout de cinq minutes.</p>
+
+<!-- ======================================================================= -->
+<h2 class="break">9. Créer les secrets sans les écrire nulle part</h2>
+<p>L'application a deux secrets : la clé qui signe les sessions des rédacteurs et le jeton du tableau de bord de l'association. Le script <code>scripts/bootstrap.sh</code>, à lancer une seule fois, les génère directement dans <b>SSM Parameter Store</b>, chiffrés par KMS (type <code>SecureString</code>). Ils ne passent jamais par un fichier.</p>
+<div class="cmd"><div class="cmd-title">scripts/bootstrap.sh · le cœur du script</div><pre>REGION="${AWS_REGION:-eu-north-1}"
+create_if_missing() {
+  if aws ssm get-parameter --region "$REGION" --name "$1" &gt;/dev/null 2&gt;&amp;1; then echo "exists:  $1"
+  else
+    aws ssm put-parameter --region "$REGION" --name "$1" --type SecureString \
+      --value "$(openssl rand -base64 32 | tr -d '=+/')" --tags Key=project,Value=collabdoc &gt;/dev/null
+    echo "created: $1"
+  fi
+}
+create_if_missing /collabdoc/session-secret
+create_if_missing /collabdoc/admin-token</pre></div>
+<div class="cmd"><div class="cmd-title">Terminal</div><pre>chmod +x scripts/*.sh
+./scripts/bootstrap.sh
+<span class="out">created: /collabdoc/session-secret
+created: /collabdoc/admin-token</span></pre></div>
+<p>Le script ne recrée pas un secret existant (<i>idempotent</i>) : on peut le relancer sans invalider les sessions en cours. Les noms de ces paramètres sont ceux du § 8.1, et seules les fonctions qui en ont besoin ont le droit <code>ssm:GetParameter</code> dessus. Avant chaque envoi vers GitHub, une vérification rapide :</p>
+<div class="cmd"><div class="cmd-title">Terminal</div><pre>git ls-files | xargs grep -lE "AKIA[0-9A-Z]{16}|aws_secret_access_key" || echo "aucune clé"
+<span class="out">aucune clé</span></pre></div>
+
+<!-- ======================================================================= -->
+<h2>10. Déployer d'une seule commande</h2>
+<p>Le script <code>scripts/deploy.sh</code> enchaîne tout. Il sert au développeur comme au correcteur qui voudra redéployer le projet.</p>
+<div class="cmd"><div class="cmd-title">scripts/deploy.sh · les étapes</div><pre>set -euo pipefail                                         # la moindre erreur arrête tout
+(cd backend &amp;&amp; npm ci &amp;&amp; npm test &amp;&amp; npm run build)       # 1. tests unitaires puis empaquetage
+sam deploy --region "$REGION"                             # 2. infrastructure (lit samconfig.toml)
+out() { aws cloudformation describe-stacks --stack-name collabdoc \
+          --query "Stacks[0].Outputs[?OutputKey=='$1'].OutputValue" --output text; }
+API_URL=$(out ApiUrl); WS_URL=$(out WebSocketUrl); BUCKET=$(out FrontendBucketName); DIST=$(out DistributionId)
+(cd frontend &amp;&amp; npm ci &amp;&amp; npm run build)                  # 3. site
+printf "window.COLLABDOC_CONFIG = { apiUrl: '%s', wsUrl: '%s' }\n" "$API_URL" "$WS_URL" &gt; frontend/dist/config.js
+aws s3 sync frontend/dist "s3://$BUCKET" --delete --exclude index.html --exclude config.js \
+    --cache-control "public, max-age=31536000, immutable"  # 4. fichiers à nom unique : cache 1 an
+aws s3 cp frontend/dist/index.html "s3://$BUCKET/index.html" --cache-control "no-cache"
+aws s3 cp frontend/dist/config.js  "s3://$BUCKET/config.js"  --cache-control "no-cache" --content-type application/javascript
+aws cloudfront create-invalidation --distribution-id "$DIST" --paths "/index.html" "/config.js"</pre></div>
+<div class="cmd"><div class="cmd-title">Terminal</div><pre>./scripts/deploy.sh
+<span class="out">Successfully created/updated stack - collabdoc in eu-north-1
+Deployed.
+  Frontend : https://d2cibe3b2w1o4h.cloudfront.net
+  API      : https://yoi6qc6jul.execute-api.eu-north-1.amazonaws.com
+  WebSocket: wss://ve8vn41ool.execute-api.eu-north-1.amazonaws.com/prod
+  Admin    : https://d2cibe3b2w1o4h.cloudfront.net/#/admin</span></pre></div>
+<p>Le premier déploiement prend une dizaine de minutes, surtout pour CloudFront. Les suivants ne mettent à jour que ce qui a changé. Les fichiers produits par Vite portent une empreinte dans leur nom : on peut les mettre en cache un an. <code>index.html</code> et <code>config.js</code> sont en <code>no-cache</code>, et on invalide leur copie dans CloudFront pour qu'une nouvelle version soit visible tout de suite.</p>
+<p>Dans la console, <b>CloudFormation › Stacks › collabdoc › Resources</b> liste tout ce qui a été créé. Pour compter les ressources étiquetées et récupérer le jeton du tableau de bord :</p>
+<div class="cmd"><div class="cmd-title">Terminal</div><pre>aws resourcegroupstaggingapi get-resources --tag-filters Key=project,Values=collabdoc \
+  --query 'length(ResourceTagMappingList)'
+<span class="out">30</span>
+aws ssm get-parameter --name /collabdoc/admin-token --with-decryption --query Parameter.Value --output text</pre></div>
+
+<!-- ======================================================================= -->
+<h2>11. Samedi : essayer l'application, et l'histoire de l'e-mail</h2>
+<p>On ouvre l'URL du site, on saisit un nom et un e-mail, on crée un document, on ouvre le même document dans un second navigateur avec un autre nom : les curseurs et les modifications apparaissent des deux côtés. On crée un lien de 2 exemplaires, on ouvre <code>#/d/&lt;linkId&gt;</code>, on télécharge deux fois, la troisième tentative affiche « épuisé ».</p>
+<p>À la création de son <b>premier</b> lien, le rédacteur reçoit un e-mail <i>« AWS Notification - Subscription Confirmation »</i> envoyé par <code>no-reply@sns.amazonaws.com</code>. Il clique une fois sur <i>Confirm subscription</i>. Il sera ensuite prévenu à chaque dernier téléchargement de ses liens. Le README doit le signaler au jury.</p>
+<div class="box astuce"><div class="box-title">PIÈGE · POURQUOI SNS ET PAS SES (AMAZON SIMPLE EMAIL SERVICE)</div>
+<p>La première version envoyait l'e-mail avec SES, depuis l'adresse Gmail du développeur, vérifiée dans SES. En démonstration, aucun e-mail n'est arrivé. Les journaux CloudWatch (<b>CloudWatch › Log groups › /collabdoc/collabdoc/lambda</b>) ont montré deux causes :</p>
+<ul>
+<li>un envoi accepté par SES, puis filtré par Gmail : un message « @gmail.com » qui ne sort pas des serveurs de Google échoue au contrôle anti-usurpation <b>DMARC</b> ;</li>
+<li>un envoi refusé : un compte SES neuf est en <b>sandbox</b> et n'écrit qu'à des adresses vérifiées une par une.</li>
+</ul>
+<p>Sans nom de domaine à soi (nécessaire pour configurer DKIM et SPF) et sans le délai d'une demande de sortie de sandbox, SES ne convient pas pour un week-end. SNS écrit à n'importe quelle adresse, depuis une adresse d'AWS. La contrepartie, une confirmation unique par destinataire, est une règle anti-spam d'AWS. <b>Faites directement le choix de SNS.</b></p></div>
+
+<!-- ======================================================================= -->
+<h2>12. Prouver chaque contrainte, dans le code et sur AWS</h2>
+<h3>12.1 Les tests de bout en bout</h3>
+<p>Ils sont écrits en Node.js, dans <code>tests/</code>, avec les paquets <code>ws</code> et <code>yjs</code>. Ils n'utilisent <b>que l'API publique</b>, comme le ferait le jury. Chacun écrit ses résultats bruts en JSON dans <code>tests/results/</code> et affiche PASS ou FAIL.</p>
+<div class="cmd"><div class="cmd-title">Terminal</div><pre>cd backend &amp;&amp; npm test &amp;&amp; cd ..                                      # tests unitaires
+cd tests &amp;&amp; npm ci
+FRONT_URL=&lt;FrontendUrl&gt; node smoke.mjs                                 # parcours complet
+WRITERS=50 EDITS=20 node convergence/convergence.mjs                   # C2 : 50 rédacteurs à la position 0
+MAX=100 CLICKS=3000 node load/claim-race.mjs                           # C1 : 3 000 clics simultanés, 100 exemplaires
+DEVICES=10 node load/credit-multidevice.mjs                            # C4 : 10 appareils, puis acharnement</pre></div>
+<table>
+<tr><th style="width:22%">Test</th><th>Comment il prouve la contrainte</th></tr>
+<tr><td>convergence (C2)</td><td>Chaque modification insère un marqueur unique. On vérifie que chaque marqueur dont l'envoi a reçu 200 apparaît <b>exactement une fois</b> dans le document du serveur, puis que la copie de chaque participant est identique.</td></tr>
+<tr><td>claim-race (C1)</td><td>Tous les clics partent au même instant, sans nouvel essai. On compte les 200, on relit <code>remaining</code> et on vérifie que les numéros d'exemplaire sont tous distincts (1..N).</td></tr>
+<tr><td>credit-multidevice (C4)</td><td>Le même e-mail sur 10 sessions qui écrivent en parallèle : exactement 10 000 caractères acceptés, puis un refus, puis le blocage après 20 refus.</td></tr>
+</table>
+
+<h3>12.2 Relire la preuve directement dans AWS</h3>
+<p>Le jury croira davantage ce qu'il voit dans AWS que ce qu'affiche un script. Les noms réels des tables se trouvent dans <b>CloudFormation › collabdoc › Resources</b>.</p>
+<div class="cmd"><div class="cmd-title">Terminal · C1 : lien de 2 exemplaires, 3 demandes</div><pre>for i in 1 2 3; do curl -s -o /dev/null -w "%{http_code}\n" -X POST "$API/links/$LINK/claim"; done
+<span class="out">200
+200
+410</span>
+aws dynamodb get-item --table-name &lt;LinksTable&gt; --key '{"linkId":{"S":"'$LINK'"}}' \
+  --query 'Item.{max:maxDownloads.N,restants:remaining.N}'
+<span class="out">{ "max": "2", "restants": "0" }</span>
+aws dynamodb query --table-name &lt;ClaimsTable&gt; --key-condition-expression "linkId = :l" \
+  --expression-attribute-values '{":l":{"S":"'$LINK'"}}' --select COUNT --query Count
+<span class="out">2</span></pre></div>
+<div class="cmd"><div class="cmd-title">Terminal · C3 et C4</div><pre>aws s3 ls s3://&lt;DataBucket&gt;/pdf/$DOC/              # un PDF par révision : même lien, document à jour
+<span class="out">2026-10-25 04:47:54   1064 1.pdf
+2026-10-25 04:47:58   1088 2.pdf</span>
+aws dynamodb get-item --table-name &lt;CreditsTable&gt; --key '{"pk":{"S":"&lt;email&gt;#2026-10-24"}}' --query 'Item.used.N'
+<span class="out">"10000"</span></pre></div>
+<div class="cmd"><div class="cmd-title">Terminal · C5 et C6 : les protections sont bien en place</div><pre>aws apigatewayv2 get-stage --api-id &lt;HttpApi&gt; --stage-name '$default' --query RouteSettings
+<span class="out">{ "POST /links/{linkId}/claim": { "ThrottlingBurstLimit": 300, "ThrottlingRateLimit": 300.0 } }</span>
+aws lambda get-function-concurrency --function-name &lt;ClaimFunction&gt;
+<span class="out">{ "ReservedConcurrentExecutions": 100 }</span>
+aws lambda list-event-source-mappings --function-name &lt;NotifyFunction&gt; \
+  --query 'EventSourceMappings[0].FilterCriteria.Filters[0].Pattern'</pre></div>
+
+<h3>12.3 Prouver le moindre privilège avec le simulateur IAM</h3>
+<div class="cmd"><div class="cmd-title">Terminal</div><pre>aws iam simulate-principal-policy --policy-source-arn &lt;rôle de ClaimFunction&gt; \
+  --action-names dynamodb:UpdateItem --resource-arns &lt;ARN de CreditsTable&gt; \
+  --context-entries ContextKeyName=aws:RequestedRegion,ContextKeyValues=eu-north-1,ContextKeyType=string \
+  --query 'EvaluationResults[0].EvalDecision'
+<span class="out">"implicitDeny"</span></pre></div>
+<p>La fonction de téléchargement est autorisée à décrémenter Links (<code>allowed</code>), mais pas à modifier un crédit, supprimer une table ou publier sur SNS (<code>implicitDeny</code>). Le paramètre <code>--context-entries</code> est indispensable sur un compte « projet » : sans lui, le simulateur ne connaît pas la région de la requête, applique la règle d'organisation qui refuse les autres régions, et répond <code>explicitDeny</code> à tout.</p>
+
+<!-- ======================================================================= -->
+<h2 class="break">13. Dimanche : le test de pic (C5 et C6)</h2>
+<h3>13.1 Pourquoi une machine de test dans la région</h3>
+<p>Les premiers tests, lancés depuis un ordinateur personnel, échouaient au-delà d'environ 300 connexions simultanées (<code>UND_ERR_CONNECT_TIMEOUT</code>), alors que CloudWatch ne montrait aucune erreur côté AWS. On mesurait la connexion internet, pas l'application. Pour simuler 15 000 visiteurs, on crée donc une machine EC2 <b>temporaire</b> dans la même région, elle aussi décrite par un modèle : <code>tests/load/loadgen.yaml</code>.</p>
+<h3>13.2 Le modèle de la machine : tests/load/loadgen.yaml</h3>
+<table>
+<tr><th style="width:24%">Ressource</th><th style="width:38%">Réglage</th><th>Justification</th></tr>
+<tr><td>ArtifactsBucket</td><td>bucket privé</td><td>Faire passer les scripts de test vers la machine et rapatrier les résultats.</td></tr>
+<tr><td>Role + InstanceProfile</td><td>politique gérée <code>AmazonSSMManagedInstanceCore</code> + lecture/écriture sur ce seul bucket</td><td>Piloter la machine par SSM, sans clé (R-Clés, R-Droits).</td></tr>
+<tr><td>SecurityGroup</td><td><b>aucune règle d'entrée</b></td><td>Pas de SSH, pas de port ouvert : rien à attaquer.</td></tr>
+<tr><td>Instance</td><td><code>m7i-flex.large</code> (2 vCPU, 8 Gio), Amazon Linux 2023 (image lue dans SSM), <code>HttpTokens: required</code> (IMDSv2), disque chiffré, <code>InstanceInitiatedShutdownBehavior: terminate</code></td><td>Le plus gros type autorisé par le plan gratuit (R-Compte). Bonnes pratiques de sécurité EC2.</td></tr>
+<tr><td>UserData</td><td><code>shutdown -h +240</code>, installation de Node.js et de k6, hausse des limites de fichiers et de ports</td><td>La machine se supprime d'elle-même au bout de 4 heures, même si on oublie de le faire. Les limites système permettent des milliers de connexions.</td></tr>
+</table>
+<div class="box astuce"><div class="box-title">PIÈGE · « THE SPECIFIED INSTANCE TYPE IS NOT ELIGIBLE FOR FREE TIER »</div><p>Le plan gratuit n'accepte que certains types d'instance. Listez-les avant de choisir :</p>
+<pre style="margin:4pt 0 0;font-family:'DejaVu Sans Mono';font-size:7.8pt">aws ec2 describe-instance-types --filters Name=free-tier-eligible,Values=true \
+  --query 'InstanceTypes[].[InstanceType,VCpuInfo.DefaultVCpus,MemoryInfo.SizeInMiB]' --output text</pre>
+<p>Résultat : <code>t3.micro</code>, <code>t4g.micro</code>, <code>t3.small</code>, <code>t4g.small</code>, <code>c7i-flex.large</code>, <code>m7i-flex.large</code>. On prend le dernier.</p></div>
+
+<h3>13.3 Piloter la machine : scripts/loadtest.sh</h3>
+<div class="cmd"><div class="cmd-title">Terminal</div><pre>./scripts/loadtest.sh up                        # aws cloudformation deploy de loadgen.yaml (~3 min), attend l'agent SSM
+./scripts/loadtest.sh run 'bash load/peak.sh'   # envoie tests/ par S3, exécute par SSM Run Command (~8 min)
+./scripts/loadtest.sh pull                      # rapatrie tests/results/
+tests/load/cloudwatch-metrics.sh &lt;début UTC&gt; &lt;fin UTC&gt; &gt; tests/results/cloudwatch-&lt;run&gt;.json
+./scripts/loadtest.sh down                      # vide le bucket et supprime la pile collabdoc-loadgen</pre></div>
+<p><code>run</code> archive le dossier <code>tests/</code>, le dépose dans le bucket, puis lance <code>aws ssm send-command --document-name AWS-RunShellScript</code> sur la machine avec les URL de l'application, et attend la fin en interrogeant <code>get-command-invocation</code>. Tout passe par les API d'AWS : aucune connexion directe à la machine. Pour ces tests, k6 est le bon outil : il simule des milliers de visiteurs depuis une seule machine.</p>
+
+<h3>13.4 Le scénario et les résultats</h3>
+<p><code>tests/load/peak.sh</code> démarre 300 rédacteurs qui écrivent sans interruption dans 30 documents pendant 7 minutes (<code>writers.mjs</code>). Il crée ensuite un lien de 500 exemplaires et lance k6 (<code>spike.js</code>) : 1 500 visiteurs à la seconde même de l'annonce, 12 000 dans la première minute (80 %), puis le reste sur 4 minutes. Chaque visiteur fait comme la page : il lit le statut, demande un exemplaire, attend et réessaie sur « patientez », jusqu'à « téléchargé » ou « épuisé ». <code>cloudwatch-metrics.sh</code> relève ensuite la vue côté serveur : invocations, erreurs, limitations, concurrence et latences.</p>
+<table>
+<tr><th>Mesure (pic final)</th><th style="width:28%">Valeur</th><th style="width:30%">Ce que cela prouve</th></tr>
+<tr><td>Téléchargements réussis / exemplaires</td><td><b>500 / 500</b></td><td>C1 sous la pire charge</td></tr>
+<tr><td>Modifications acceptées et retrouvées / envoyées</td><td><b>79 334 / 79 334</b>, 0 en double</td><td>C2 sous charge</td></tr>
+<tr><td>Visiteurs sans réponse finale · réponses inattendues</td><td>0 · 0</td><td>C5 : « sans casser, ni jeter »</td></tr>
+<tr><td>Erreurs Lambda · requêtes DynamoDB limitées</td><td>0 · 0</td><td>Rien n'a cassé côté AWS</td></tr>
+<tr><td>Concurrence max : téléchargement / édition</td><td>100 (plafond) / 75</td><td>Le cloisonnement a protégé les rédacteurs</td></tr>
+<tr><td>Latence d'une modification, p99</td><td>221 ms</td><td>Les rédacteurs n'ont rien senti</td></tr>
+<tr><td>Délai de la réponse « épuisé », p50</td><td>44 ms</td><td>C6 : on l'apprend vite</td></tr>
+<tr><td>Invocations de la fonction e-mail</td><td>1</td><td>Un seul e-mail au créateur</td></tr>
+</table>
+
+<h3>13.5 Ce que les tests ont fait corriger</h3>
+<ul>
+<li><b>Connexions supprimées pendant leur ouverture.</b> API Gateway répond « Gone » pour une connexion WebSocket encore en cours d'ouverture, et le code la supprimait : la moitié des rédacteurs ne recevaient plus rien en direct. Correction : ne supprimer une connexion « Gone » que si elle a plus de 30 s.</li>
+<li><b>38 632 envois refusés (<code>TooManyRequestsException</code>)</b> avec 50 rédacteurs dans un même document. Corrections : la limite de l'étage WebSocket relevée à 5 000 messages par seconde (§ 8.7), les envois refusés réessayés, et surtout la resynchronisation par vecteur d'état toutes les 15 s côté navigateur (§ 7).</li>
+</ul>
+<p>Dans les deux cas, aucune modification <i>acceptée</i> n'était perdue : DynamoDB contenait tout, et seul l'affichage en direct était en retard. Gardez les résultats d'avant correction dans <code>tests/results/archive/</code> : ils montrent au jury que les tests ont servi.</p>
+<div class="box attention"><div class="box-title">À LA FIN DE CHAQUE SÉANCE</div><pre style="margin:0;font-family:'DejaVu Sans Mono';font-size:7.8pt">aws ec2 describe-instances --filters Name=instance-state-name,Values=pending,running --query 'length(Reservations)'
+<span class="out">0</span></pre></div>
+
+<!-- ======================================================================= -->
+<h2>14. Prouver ce que le projet a coûté</h2>
+<p>Le livrable n° 5 demande une <i>preuve</i>. On en construit trois : les prix officiels, les volumes mesurés et les relevés du compte.</p>
+<div class="cmd"><div class="cmd-title">Terminal</div><pre># 1. Prix officiels de la région (l'API de tarification n'existe qu'en us-east-1 ; c'est une lecture, pas une ressource)
+aws pricing get-products --region us-east-1 --service-code AmazonApiGateway \
+  --filters Type=TERM_MATCH,Field=location,Value="EU (Stockholm)"
+# 2. Crédits restants, à relever avant, pendant et après
+aws freetier get-account-plan-state
+# 3. Coûts réels par service et par jour (publiés avec environ 24 h de retard)
+aws ce get-cost-and-usage --region us-east-1 --time-period Start=2026-10-24,End=2026-10-27 \
+  --granularity DAILY --metrics UnblendedCost --group-by Type=DIMENSION,Key=SERVICE</pre></div>
+<table>
+<tr><th>Poste</th><th style="width:36%">Volume mesuré</th><th style="width:20%">Coût</th></tr>
+<tr><td>Un pic complet (WebSocket, HTTP, DynamoDB)</td><td>786 447 messages, 116 368 requêtes, ≈ 0,75 M d'unités DynamoDB</td><td>≈ 1,30 $</td></tr>
+<tr><td>Machine de test m7i-flex.large</td><td>≈ 1 h à 0,10175 $/h</td><td>≈ 0,10 $</td></tr>
+<tr><td>Lambda, CloudFront, S3, SNS, SSM</td><td>dans les niveaux toujours gratuits</td><td>≈ 0 $</td></tr>
+<tr><td><b>Projet entier</b> (3 pics, tests, déploiements)</td><td></td><td><b>≈ 4,50 $ de crédits, 0 $ payé</b></td></tr>
+</table>
+<p>Complétez par des captures de <b>Billing and Cost Management › Cost Explorer</b>, filtrées sur la région et l'étiquette <code>project</code>, et regroupées par service. Au repos, l'application ne coûte rien : aucune machine n'est allumée.</p>
+
+<!-- ======================================================================= -->
+<h2>15. Lundi matin : rendre, puis tout supprimer</h2>
+<h3>15.1 Vérifier les livrables</h3>
+<table>
+<tr><th style="width:36%">Le sujet demande</th><th>Où c'est dans le dépôt</th></tr>
+<tr><td>Code, infrastructure, tests, README</td><td><code>backend/</code>, <code>frontend/</code>, <code>template.yaml</code> + <code>samconfig.toml</code>, <code>tests/</code>, <code>README.md</code> (sections Déployer, Tester, Supprimer)</td></tr>
+<tr><td>Dossier de conception</td><td><code>docs/conception.md</code> : le tableau du § 1, les alternatives écartées, le modèle de données, la sécurité, les limites</td></tr>
+<tr><td>Rapport de test (méthode, objectifs, résultats bruts, analyse, preuve de C1 et C2)</td><td><code>docs/rapport-tests.md</code> + <code>tests/results/*.json</code></td></tr>
+<tr><td>Description de l'API</td><td><code>docs/api.md</code> : chaque route, ses paramètres, ses réponses (200, 403, 410, 423, 429, 503) et les messages WebSocket</td></tr>
+<tr><td>Preuve des coûts</td><td><code>docs/couts.md</code> + captures Cost Explorer</td></tr>
+</table>
+<div class="cmd"><div class="cmd-title">Terminal</div><pre>git add -A &amp;&amp; git commit -m "Projet CollabDoc"
+git remote add origin git@github.com:&lt;compte&gt;/CollabDoc.git &amp;&amp; git push -u origin main</pre></div>
+
+<h3>15.2 Tout supprimer, après la soutenance</h3>
+<div class="box attention"><div class="box-title">PAS AVANT LA PRÉSENTATION</div><p>La démonstration a besoin de l'application en ligne. Au repos, elle ne coûte rien.</p></div>
+<div class="cmd"><div class="cmd-title">scripts/destroy.sh · le cœur du script</div><pre>for b in "$(out FrontendBucketName)" "$(out DataBucketName)"; do
+  aws s3 rm "s3://$b" --recursive                 # CloudFormation refuse de supprimer un bucket non vide
+done
+sam delete --stack-name collabdoc --no-prompts    # tables, fonctions, API, CloudFront, SNS et abonnements
+aws ssm delete-parameters --names /collabdoc/session-secret /collabdoc/admin-token</pre></div>
+<div class="cmd"><div class="cmd-title">Terminal</div><pre>./scripts/destroy.sh
+aws resourcegroupstaggingapi get-resources --tag-filters Key=project,Values=collabdoc \
+  --query 'length(ResourceTagMappingList)'
+<span class="out">0</span></pre></div>
+<p>Il reste le petit bucket où SAM dépose le code, dans la pile <code>aws-sam-cli-managed-default</code>, qui ne coûte presque rien. Pour le supprimer aussi : le vider (y compris ses anciennes versions) depuis la console S3, puis <code>aws cloudformation delete-stack --stack-name aws-sam-cli-managed-default</code>.</p>
+
+<!-- ======================================================================= -->
+<h2 class="break">Annexe A · Toutes les commandes, dans l'ordre</h2>
+<div class="cmd"><div class="cmd-title">Du compte vide à l'application en ligne</div><pre># Vendredi : poste et compte
+aws --version &amp;&amp; sam --version &amp;&amp; node --version            # outils installés (§ 3)
+aws login --region eu-north-1 &amp;&amp; aws configure set region eu-north-1
+aws sts get-caller-identity
+aws lambda get-account-settings --query AccountLimit.ConcurrentExecutions   # ≥ 200, sinon demander une hausse
+aws freetier get-account-plan-state                            # crédits de départ
+
+# Dépôt, code, modèle (§ 5 à 8)
+git init · .gitignore · samconfig.toml · backend/ · frontend/ · template.yaml
+sam validate --lint
+
+# Mise en ligne (§ 9 et 10)
+./scripts/bootstrap.sh
+./scripts/deploy.sh
+
+# Tests (§ 12 et 13)
+(cd backend &amp;&amp; npm test)
+cd tests &amp;&amp; npm ci &amp;&amp; node convergence/convergence.mjs &amp;&amp; node load/claim-race.mjs &amp;&amp; node load/credit-multidevice.mjs
+./scripts/loadtest.sh up &amp;&amp; ./scripts/loadtest.sh run 'bash load/peak.sh' &amp;&amp; ./scripts/loadtest.sh pull &amp;&amp; ./scripts/loadtest.sh down
+
+# Coûts (§ 14), puis fin (§ 15)
+aws ce get-cost-and-usage --region us-east-1 ...
+./scripts/destroy.sh</pre></div>
+
+<h2>Annexe B · Où chaque règle du sujet est appliquée</h2>
+<table>
+<tr><th style="width:22%">Règle</th><th>Application concrète</th></tr>
+<tr><td>Plan gratuit, une région</td><td>Compte Free plan (aucune facture possible) ; <code>region</code> dans <code>samconfig.toml</code> et dans les scripts ; services à l'usage, nuls au repos ; machine de test d'un type gratuit, supprimée après usage.</td></tr>
+<tr><td>Aucune clé AWS</td><td><code>aws login</code> (identifiants temporaires) ; rôles IAM pour les fonctions et la machine ; secrets applicatifs générés dans SSM Parameter Store ; vérification <code>grep AKIA</code> avant chaque envoi.</td></tr>
+<tr><td>Moindre privilège</td><td>Un rôle par fonction, action par action et ressource par ressource (§ 8.8) ; buckets privés ; site lisible par la seule distribution CloudFront ; machine sans port ouvert ; preuve par <code>simulate-principal-policy</code>.</td></tr>
+<tr><td>Fichiers dans S3</td><td>PDF dans <code>DataBucket/pdf/</code>, distribués par URL pré-signée de 60 s ; versions dans <code>versions/</code>.</td></tr>
+<tr><td>Bonnes pratiques</td><td>Infrastructure as Code ; déploiement et suppression scriptés ; étiquette <code>project</code> ; journaux avec rétention ; chiffrement et HTTPS obligatoire ; tests unitaires avant chaque déploiement ; idempotence et réessais avec délai aléatoire ; Lambda arm64.</td></tr>
+</table>
+
+<h2>Sources</h2>
+<ol class="sources">
+<li>AWS CLI : installation et <code>aws login</code>, docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html et …/cli-configure-sign-in.html.</li>
+<li>AWS SAM CLI : installation, docs.aws.amazon.com/serverless-application-model/latest/developerguide/install-sam-cli.html.</li>
+<li>Régions d'un compte « projet », docs.aws.amazon.com/accounts/latest/reference/project-regions.html.</li>
+<li>DynamoDB : expressions de condition et transactions, docs.aws.amazon.com/amazondynamodb/latest/developerguide/.</li>
+<li>Lambda : concurrence réservée et filtrage d'événements, docs.aws.amazon.com/lambda/latest/dg/configuration-concurrency.html et …/invocation-eventfiltering.html.</li>
+<li>API Gateway : limitation des API HTTP ; CloudFront : Origin Access Control, docs.aws.amazon.com/apigateway/ et docs.aws.amazon.com/AmazonCloudFront/.</li>
+<li>Dépôt du projet : README.md, docs/conception.md, docs/api.md, docs/rapport-tests.md, docs/couts.md, tests/results/.</li>
+</ol>
+
+</body>
+</html>

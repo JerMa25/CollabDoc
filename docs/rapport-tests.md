@@ -211,3 +211,18 @@ DEVICES=10 node load/credit-multidevice.mjs            # contrainte 4
 tests/load/cloudwatch-metrics.sh <début UTC> <fin UTC> > tests/results/cloudwatch-<run>.json
 ./scripts/loadtest.sh down
 ```
+
+## 10. E-mail de dernier téléchargement (après passage à SNS)
+
+Test de bout en bout du 25/10, avec deux adresses réelles ayant confirmé leur abonnement SNS :
+
+| Étape | Observation |
+|---|---|
+| Création d'un lien de 1 exemplaire par `tchamijerry@gmail.com` | Réponse `"notification": "pending"`, e-mail « AWS Notification - Subscription Confirmation » reçu et confirmé |
+| 1ᵉʳ `POST /links/-KBMLWVQpoU/claim` | `200`, exemplaire n°1 |
+| 2ᵉ `POST /links/-KBMLWVQpoU/claim` | `410`, lien épuisé |
+| Journal de `NotifyFunction` | `last_download_notification_sent` → `tchamijerry@gmail.com` (et, pour un lien épuisé depuis l'interface, → `tchamij925@gmail.com`) |
+| Métrique SNS `NumberOfNotificationsDelivered` | **2** e-mails remis aux serveurs de messagerie des destinataires |
+
+Comme pendant le pic (§5.3), la notification est déclenchée **une seule fois** par lien, au passage
+de 1 à 0 exemplaire, sans intervenir dans le traitement du téléchargement.

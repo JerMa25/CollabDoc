@@ -1,13 +1,13 @@
 version = 0.1
 
 [default.global.parameters]
-stack_name = "collabdoc"
-region = "eu-north-1"
+stack_name = "collabdoc"                # nom de la pile CloudFormation
+region = "eu-north-1"                   # la seule région (R-Compte)
 
 [default.deploy.parameters]
-capabilities = "CAPABILITY_IAM"
-resolve_s3 = true
+capabilities = "CAPABILITY_IAM"         # autorise SAM à créer les rôles IAM des fonctions
+resolve_s3 = true                       # SAM crée lui-même le bucket où il dépose le code
 s3_prefix = "collabdoc"
-confirm_changeset = false
-fail_on_empty_changeset = false
-tags = "project=\"collabdoc\""
+confirm_changeset = false               # pas de question interactive (script reproductible)
+fail_on_empty_changeset = false         # redéployer sans changement n'est pas une erreur
+tags = "project=\"collabdoc\""          # étiquette sur toutes les ressources : suivi des coûts
